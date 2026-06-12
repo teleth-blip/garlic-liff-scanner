@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>にんにく冷蔵庫 QR読取</title>
+  <style>
+    :root {
+      --bg: #f5f7f3;
+      --panel: #ffffff;
+      --text: #18201c;
+      --muted: #66746d;
+      --primary: #116149;
+      --primary-dark: #0b4937;
+      --danger: #b42318;
+      --border: #d9e0dc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    main {
+      width: min(720px, 100%);
+      margin: 0 auto;
+      padding: 18px 14px 28px;
+    }
+    h1 {
+      margin: 0 0 14px;
+      font-size: 24px;
+      line-height: 1.25;
+    }
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      background: var(--panel);
+      box-shadow: 0 8px 20px rgba(20, 35, 28, .08);
+    }
+    .status {
+      min-height: 48px;
+      margin: 0 0 12px;
+      border: 1px solid #c8ddd2;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #eef8f2;
+      color: #174c3d;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+    .status.error {
+      border-color: #f1b6b0;
+      background: #fff2f0;
+      color: var(--danger);
+    }
+    .actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    button, a.button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 52px;
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 900;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button:active, a.button:active { background: var(--primary-dark); }
+    button.secondary, a.button.secondary {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    input, select {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid #c9d1d9;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--text);
+      font-size: 16px;
+    }
+    .result {
+      display: none;
+      margin-top: 14px;
+      border: 1px solid #c8ddd2;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f3fbf6;
+    }
+    .result strong {
+      display: block;
+      font-size: 22px;
+      overflow-wrap: anywhere;
+    }
+    .muted {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>にんにく冷蔵庫 QR読取</h1>
+    <section class="panel">
+      <p id="status" class="status">初期化中です...</p>
+
+      <label>
+        戻り先
+        <select id="target">
+          <option value="inPalletNo">入庫</option>
+          <option value="outPalletNo">出庫</option>
+          <option value="moveStartPalletNo">仮移動</option>
+          <option value="moveDonePalletNo">移動確定</option>
+        </select>
+      </label>
+
+      <div class="actions">
+        <button type="button" id="scanBtn">QRを読み取る</button>
+        <a id="returnBtn" class="button secondary" href="#">管理画面へ戻る</a>
+      </div>
+
+      <div id="result" class="result">
+        <span>読取結果</span>
+        <strong id="resultText"></strong>
+        <div class="actions">
+          <button type="button" id="sendBtn">この番号を管理画面へ送る</button>
+        </div>
+      </div>
+
+      <label>
+        手入力
+        <input id="manualText" type="text" inputmode="text" autocomplete="off" placeholder="例: 2026-0001">
+      </label>
+      <div class="actions">
+        <button type="button" class="secondary" id="manualBtn">手入力の番号を送る</button>
+      </div>
+
+      <p class="muted">このページはGitHub Pagesに置くLIFF専用ページです。QR読取後、Apps Scriptの管理画面へ戻します。</p>
+    </section>
+  </main>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+    const LIFF_ID = '2010379383-rwQBpt0b';
+    const DEFAULT_RETURN_URL = 'https://script.google.com/macros/s/AKfycbwV9IecaDNZL6sfojQxGZjZ4wlS19nzJkWJi4ZkiaCnNlLx8yoD1UzgQbAcMgPErwt3DA/exec';
+
+    const els = {
+      status: document.getElementById('status'),
+      target: document.getElementById('target'),
+      scanBtn: document.getElementById('scanBtn'),
+      returnBtn: document.getElementById('returnBtn'),
+      result: document.getElementById('result'),
+      resultText: document.getElementById('resultText'),
+      sendBtn: document.getElementById('sendBtn'),
+      manualText: document.getElementById('manualText'),
+      manualBtn: document.getElementById('manualBtn')
+    };
+
+    let lastValue = '';
+    const params = new URLSearchParams(location.search);
+    const liffStateParams = parseLiffState(params.get('liff.state'));
+    const returnUrl = getParam('returnUrl') || DEFAULT_RETURN_URL;
+    const initialTarget = getParam('target') || 'inPalletNo';
+    if ([...els.target.options].some(option => option.value === initialTarget)) {
+      els.target.value = initialTarget;
+    }
+    els.returnBtn.href = buildReturnUrl('');
+
+    document.addEventListener('DOMContentLoaded', init);
+    els.scanBtn.addEventListener('click', scanQr);
+    els.sendBtn.addEventListener('click', () => sendValue(lastValue));
+    els.manualBtn.addEventListener('click', () => sendValue(els.manualText.value));
+    els.target.addEventListener('change', () => {
+      els.returnBtn.href = buildReturnUrl('');
+    });
+
+    async function init() {
+      setStatus('LIFFを初期化中です...');
+      if (!window.liff) {
+        setStatus('LIFF SDKを読み込めませんでした。LINEから開き直してください。', true);
+        return;
+      }
+      try {
+        await withTimeout(window.liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true }), 15000, 'LIFF初期化が応答しません');
+        if (!window.liff.isInClient() && typeof window.liff.isLoggedIn === 'function' && !window.liff.isLoggedIn()) {
+          window.liff.login({ redirectUri: location.href });
+          return;
+        }
+        setStatus(`読取できます。${diagnostics()}`);
+      } catch (error) {
+        setStatus(`LIFF初期化エラー: ${errorText(error)} / ${diagnostics()}`, true);
+      }
+    }
+
+    async function scanQr() {
+      setStatus('QR読取を起動中です...');
+      try {
+        if (!window.liff || typeof window.liff.scanCodeV2 !== 'function') {
+          throw new Error('この環境ではLIFF QR読取を使えません');
+        }
+        if (typeof window.liff.isApiAvailable === 'function' && !window.liff.isApiAvailable('scanCodeV2')) {
+          throw new Error('Scan QRが利用不可です。LIFF設定のScan QRとSize Fullを確認してください');
+        }
+        const result = await withTimeout(window.liff.scanCodeV2(), 20000, 'QR読取が応答しません');
+        const value = String(result && result.value || '').trim();
+        if (!value) {
+          setStatus('読取結果が空でした。もう一度読み取ってください。', true);
+          return;
+        }
+        lastValue = value;
+        els.resultText.textContent = value;
+        els.result.style.display = 'block';
+        setStatus(`読み取りました: ${value}`);
+      } catch (error) {
+        setStatus(`QR読取エラー: ${errorText(error)} / ${diagnostics()}`, true);
+      }
+    }
+
+    function sendValue(value) {
+      const clean = String(value || '').trim();
+      if (!clean) {
+        setStatus('送る番号が空です。', true);
+        return;
+      }
+      location.href = buildReturnUrl(clean);
+    }
+
+    function buildReturnUrl(value) {
+      const url = new URL(returnUrl);
+      url.searchParams.set('scanTarget', els.target.value);
+      if (value) url.searchParams.set('scanValue', value);
+      url.searchParams.set('scanAt', new Date().toISOString());
+      return url.toString();
+    }
+
+    function getParam(name) {
+      return liffStateParams.get(name) || params.get(name) || '';
+    }
+
+    function parseLiffState(value) {
+      const text = String(value || '').trim();
+      if (!text) return new URLSearchParams();
+      const query = text.charAt(0) === '?' ? text.slice(1) : text;
+      return new URLSearchParams(query);
+    }
+
+    function setStatus(message, isError) {
+      els.status.textContent = message;
+      els.status.classList.toggle('error', !!isError);
+    }
+
+    function errorText(error) {
+      if (!error) return '詳細なし';
+      const parts = [];
+      if (error.code) parts.push(error.code);
+      if (error.message) parts.push(error.message);
+      if (error.cause && error.cause.message) parts.push(error.cause.message);
+      return parts.join(' ') || String(error);
+    }
+
+    function diagnostics() {
+      const parts = [];
+      const safe = (label, fn) => {
+        try {
+          const value = fn();
+          if (value !== undefined && value !== null && value !== '') parts.push(`${label}:${value}`);
+        } catch (e) {
+          parts.push(`${label}:error`);
+        }
+      };
+      safe('inClient', () => window.liff && window.liff.isInClient && window.liff.isInClient());
+      safe('os', () => window.liff && window.liff.getOS && window.liff.getOS());
+      safe('line', () => window.liff && window.liff.getLineVersion && window.liff.getLineVersion());
+      safe('api', () => window.liff && window.liff.isApiAvailable && window.liff.isApiAvailable('scanCodeV2'));
+      return parts.join(' ');
+    }
+
+    function withTimeout(promise, timeoutMs, timeoutMessage) {
+      let timer = 0;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+      });
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    }
+  </script>
+</body>
+</html>
