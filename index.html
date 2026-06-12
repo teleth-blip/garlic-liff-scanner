@@ -183,6 +183,7 @@
     const liffStateParams = parseLiffState(params.get('liff.state'));
     const returnUrl = getParam('returnUrl') || DEFAULT_RETURN_URL;
     const initialTarget = getParam('target') || 'inPalletNo';
+    const scanState = getParam('scanState') || '';
     if ([...els.target.options].some(option => option.value === initialTarget)) {
       els.target.value = initialTarget;
     }
@@ -251,6 +252,7 @@
       const url = new URL(returnUrl);
       url.searchParams.set('scanTarget', els.target.value);
       if (value) url.searchParams.set('scanValue', value);
+      if (scanState) url.searchParams.set('scanState', scanState);
       url.searchParams.set('scanAt', new Date().toISOString());
       return url.toString();
     }
