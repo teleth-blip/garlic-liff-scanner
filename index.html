@@ -6,6 +6,7 @@
   <title>にんにく冷蔵庫管理</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root {
       --bg: #f3f6f4;
@@ -712,6 +713,7 @@
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwV9IecaDNZL6sfojQxGZjZ4wlS19nzJkWJi4ZkiaCnNlLx8yoD1UzgQbAcMgPErwt3DA/exec';
     const APP_HOME_URL = location.origin + location.pathname;
+    const LIFF_ID = '2010379383-rwQBpt0b';
     const state = {
       data: null,
       workerId: localStorage.getItem('garlic.workerId') || '',
@@ -722,6 +724,10 @@
       masterDraftKey: '',
       masterUnavailable: new Set(),
       scanner: null,
+      liff: {
+        initPromise: null,
+        initialized: false
+      },
       apiBridge: {
         frame: null,
         ready: false,
@@ -832,11 +838,24 @@
     }
 
     function getLaunchParams() {
-      const params = new URLSearchParams(location.search);
+      const params = mergedUrlParams();
       return {
         palletNo: params.get('pallet') || params.get('palletNo') || params.get('p') || params.get('qr') || '',
         mode: params.get('mode') || params.get('action') || ''
       };
+    }
+
+    function mergedUrlParams() {
+      const merged = new URLSearchParams(location.search);
+      const liffState = merged.get('liff.state');
+      if (liffState) {
+        const normalized = liffState.startsWith('?') ? liffState.slice(1) : liffState;
+        const stateParams = new URLSearchParams(normalized);
+        stateParams.forEach((value, key) => {
+          if (!merged.has(key)) merged.set(key, value);
+        });
+      }
+      return merged;
     }
 
     function applyLaunchAction(action) {
@@ -1542,6 +1561,66 @@
     }
 
     async function startScanner(targetId) {
+      if (isLineClient()) {
+        try {
+          await startLiffScanner(targetId);
+          return;
+        } catch (error) {
+          showToast(lineScanErrorMessage(error), true);
+          return;
+        }
+      }
+      await startCameraScanner(targetId);
+    }
+
+    async function startLiffScanner(targetId) {
+      await ensureLiff();
+      if (!window.liff || typeof liff.scanCodeV2 !== 'function') {
+        throw new Error('LIFFのQR読取機能を利用できません。');
+      }
+      const context = typeof liff.getContext === 'function' ? liff.getContext() : null;
+      if (context && context.viewType && context.viewType !== 'full') {
+        throw new Error('LINE LIFFの画面サイズをFullにしてください。');
+      }
+      const result = await liff.scanCodeV2();
+      const raw = result && result.value ? result.value : '';
+      if (!raw) throw new Error('QRコードを読み取れませんでした。');
+      applyScannedText(targetId, raw);
+    }
+
+    function ensureLiff() {
+      if (state.liff.initialized) return Promise.resolve();
+      if (state.liff.initPromise) return state.liff.initPromise;
+      if (!window.liff || typeof liff.init !== 'function') {
+        return Promise.reject(new Error('LIFF SDKを読み込めませんでした。'));
+      }
+      state.liff.initPromise = Promise.race([
+        liff.init({ liffId: LIFF_ID }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF初期化が応答しません。')), 12000))
+      ]).then(() => {
+        state.liff.initialized = true;
+      });
+      return state.liff.initPromise;
+    }
+
+    function isLineClient() {
+      if (window.liff && typeof liff.isInClient === 'function' && liff.isInClient()) return true;
+      return /\bLine\//i.test(navigator.userAgent || '');
+    }
+
+    function lineScanErrorMessage(error) {
+      const code = error && error.code ? `${error.code}: ` : '';
+      const message = error && error.message ? error.message : String(error || '');
+      if (/init|LIFF|liff/i.test(message)) {
+        return `${code}${message} LINEで読取を使う場合は、通常URLではなくLIFF URLから開いてください。`;
+      }
+      if (/permission|forbidden|denied/i.test(message) || code === 'FORBIDDEN: ') {
+        return `${code}${message} LINE DevelopersのLIFF設定で、画面サイズFullとScan QRが有効か確認してください。`;
+      }
+      return `${code}${message || 'LINEのQR読取を開始できませんでした。'}`;
+    }
+
+    async function startCameraScanner(targetId) {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error('このブラウザではカメラを直接起動できません。');
@@ -1585,11 +1664,8 @@
           if (code && code.data) text = code.data;
         }
         if (text) {
-          const palletNo = extractPalletNo(text);
-          $(state.scanner.targetId).value = palletNo;
-          $(state.scanner.targetId).dispatchEvent(new Event('input'));
+          applyScannedText(state.scanner.targetId, text);
           stopScanner();
-          showToast(`読み取りました: ${palletNo}`);
           return;
         }
       } catch (error) {
@@ -1607,6 +1683,13 @@
       state.scanner = null;
       $('scannerVideo').srcObject = null;
       $('scannerPanel').classList.add('hidden');
+    }
+
+    function applyScannedText(targetId, text) {
+      const palletNo = extractPalletNo(text);
+      $(targetId).value = palletNo;
+      $(targetId).dispatchEvent(new Event('input'));
+      showToast(`読み取りました: ${palletNo}`);
     }
 
     function extractPalletNo(text) {
