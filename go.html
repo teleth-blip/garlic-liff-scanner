@@ -22,6 +22,7 @@
     }
     h1 { margin: 0 0 12px; font-size: 22px; }
     p { line-height: 1.6; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
     a {
       display: inline-block;
       min-height: 44px;
@@ -32,13 +33,17 @@
       font-weight: 800;
       text-decoration: none;
     }
+    a.secondary { background: #edf0f2; color: #1f2933; border: 1px solid #d8dee4; }
   </style>
 </head>
 <body>
   <main class="panel">
     <h1>にんにく冷蔵庫を開いています</h1>
     <p id="message">少し待っても切り替わらない場合は、下のボタンを押してください。</p>
-    <p><a id="openLink" href="#">開く</a></p>
+    <div class="actions">
+      <a id="openLink" href="#">開く</a>
+      <a id="normalLink" class="secondary" href="#">通常で開く</a>
+    </div>
   </main>
   <script>
     const APP_URL = 'https://script.google.com/macros/s/AKfycbwV9IecaDNZL6sfojQxGZjZ4wlS19nzJkWJi4ZkiaCnNlLx8yoD1UzgQbAcMgPErwt3DA/exec';
@@ -49,14 +54,25 @@
     if (palletNo) target.searchParams.set('pallet', palletNo);
     if (mode) target.searchParams.set('mode', mode);
     const href = target.toString();
+    const androidIntent = buildAndroidIntent(href);
     const link = document.getElementById('openLink');
-    link.href = href;
+    const normalLink = document.getElementById('normalLink');
+    const isAndroid = /Android/i.test(navigator.userAgent || '');
+    link.href = isAndroid ? androidIntent : href;
+    link.textContent = isAndroid ? 'ブラウザで開く' : '開く';
+    normalLink.href = href;
     document.getElementById('message').textContent = palletNo
       ? `パレット ${palletNo} の画面を開いています。`
       : 'にんにく冷蔵庫管理を開いています。';
     setTimeout(() => {
-      location.replace(href);
+      location.href = isAndroid ? androidIntent : href;
     }, 100);
+
+    function buildAndroidIntent(urlText) {
+      const url = new URL(urlText);
+      const path = `${url.host}${url.pathname}${url.search}`;
+      return `intent://${path}#Intent;scheme=${url.protocol.replace(':', '')};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(urlText)};end`;
+    }
   </script>
 </body>
 </html>
