@@ -62,16 +62,18 @@
     link.textContent = isAndroid ? 'ブラウザで開く' : '開く';
     normalLink.href = href;
     document.getElementById('message').textContent = palletNo
-      ? `パレット ${palletNo} の画面を開いています。`
-      : 'にんにく冷蔵庫管理を開いています。';
-    setTimeout(() => {
-      location.href = isAndroid ? androidIntent : href;
-    }, 100);
+      ? `パレット ${palletNo} の画面を開きます。`
+      : 'にんにく冷蔵庫管理を開きます。';
+    if (!isAndroid) {
+      setTimeout(() => {
+        location.href = href;
+      }, 100);
+    }
 
     function buildAndroidIntent(urlText) {
       const url = new URL(urlText);
       const path = `${url.host}${url.pathname}${url.search}`;
-      return `intent://${path}#Intent;scheme=${url.protocol.replace(':', '')};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(urlText)};end`;
+      return `intent://${path}#Intent;scheme=${url.protocol.replace(':', '')};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(location.href)};end`;
     }
   </script>
 </body>
