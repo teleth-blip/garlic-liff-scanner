@@ -278,6 +278,15 @@
       border-radius: 8px;
       background: #fafcfb;
     }
+    .producer-cell {
+      display: grid;
+      gap: 4px;
+      min-width: 180px;
+    }
+    .producer-cell input {
+      min-height: 36px;
+      padding: 6px 8px;
+    }
     .summary-detail {
       width: 100%;
       min-width: 0;
@@ -553,10 +562,11 @@
       <h3>明細</h3>
       <div class="table-wrap">
         <table id="detailTable">
-          <thead><tr><th>生産者番号</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th><th></th></tr></thead>
+          <thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th><th></th></tr></thead>
           <tbody id="detailRows"></tbody>
         </table>
       </div>
+      <datalist id="producerOptions"></datalist>
       <div class="action-row">
         <button type="button" id="addDetailBtn" class="secondary">明細追加</button>
         <button type="button" id="savePalletBtn">登録</button>
@@ -948,6 +958,7 @@
       state.workers = state.data.master.workers || state.workers;
       renderWorkers();
       renderSelectors();
+      renderProducerOptions();
       if (!state.editPalletNo && !$('detailRows').children.length) addDetailRow();
       renderRegisterTable();
       renderQrChoices();
@@ -1087,13 +1098,23 @@
     function addDetailRow(data = {}) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><input data-detail="producerNo" value="${esc(data.producerNo || '')}"></td>
+        <td>
+          <div class="producer-cell">
+            <input data-detail="producerSearch" list="producerOptions" placeholder="名前検索" value="${esc(producerDisplayValue(data.producerNo || ''))}">
+            <input data-detail="producerNo" placeholder="生産者番号" value="${esc(data.producerNo || '')}">
+          </div>
+        </td>
         <td><select data-detail="standard">${standardOptions(data.standard || '')}</select></td>
         <td><input data-detail="weight" inputmode="decimal" value="${esc(data.weight || '')}"></td>
         <td><input data-detail="price" inputmode="decimal" value="${esc(data.price || '')}"></td>
         <td><input data-detail="memo" value="${esc(data.memo || '')}"></td>
         <td><button type="button" class="secondary small">削除</button></td>
       `;
+      tr.querySelector('[data-detail="producerSearch"]').addEventListener('input', event => applyProducerSearch(tr, event.target.value));
+      tr.querySelector('[data-detail="producerNo"]').addEventListener('input', event => {
+        const producer = findProducer(event.target.value);
+        if (producer) tr.querySelector('[data-detail="producerSearch"]').value = producerDisplayValue(producer.producerNo);
+      });
       tr.querySelector('[data-detail="weight"]').addEventListener('input', updateRegisterWeight);
       tr.querySelector('button').addEventListener('click', () => {
         tr.remove();
@@ -1105,6 +1126,30 @@
 
     function standardOptions(selected) {
       return activeStandards().map(s => `<option value="${esc(s.standardName)}" ${s.standardName === selected ? 'selected' : ''}>${esc(s.standardName)}</option>`).join('');
+    }
+
+    function renderProducerOptions() {
+      const list = $('producerOptions');
+      if (!list) return;
+      list.innerHTML = activeProducers()
+        .map(p => `<option value="${esc(producerDisplayValue(p.producerNo))}"></option>`)
+        .join('');
+    }
+
+    function producerDisplayValue(producerNo) {
+      const producer = findProducer(producerNo);
+      return producer ? `${producer.producerName} / ${producer.producerNo}` : cleanText(producerNo);
+    }
+
+    function applyProducerSearch(row, value) {
+      const producer = findProducerByDisplay(value);
+      if (producer) row.querySelector('[data-detail="producerNo"]').value = producer.producerNo;
+    }
+
+    function findProducerByDisplay(value) {
+      const text = cleanText(value);
+      if (!text) return null;
+      return activeProducers().find(p => producerDisplayValue(p.producerNo) === text || p.producerNo === text || p.producerName === text) || null;
     }
 
     function clearRegisterForm() {
@@ -1233,7 +1278,7 @@
 
     function detailMiniTable(details) {
       return `<table class="detail-mini"><thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th></tr></thead><tbody>${
-        details.map(d => `<tr><td>${esc(d.producerNo)}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td></tr>`).join('')
+        details.map(d => `<tr><td>${esc(producerLabel(d))}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td></tr>`).join('')
       }</tbody></table>`;
     }
 
@@ -1428,7 +1473,7 @@
 
     function detailSummaryTable(details) {
       return `<table class="summary-detail"><thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th></tr></thead><tbody>${
-        details.map(d => `<tr><td>${esc(d.producerNo)}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td><td>${esc(d.memo || '')}</td></tr>`).join('')
+        details.map(d => `<tr><td>${esc(producerLabel(d))}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td><td>${esc(d.memo || '')}</td></tr>`).join('')
       }</tbody></table>`;
     }
 
@@ -2025,9 +2070,13 @@
     }
     function activeCoolers() { return state.data ? state.data.master.coolers.filter(c => c.active) : []; }
     function activeStandards() { return state.data ? state.data.master.standards.filter(s => s.active) : []; }
+    function activeProducers() { return state.data && state.data.master.producers ? state.data.master.producers : []; }
     function sortedPallets() { return state.data ? [...state.data.pallets].sort((a, b) => a.palletNo.localeCompare(b.palletNo)) : []; }
     function findPallet(palletNo) { return state.data && state.data.pallets.find(p => p.palletNo === String(palletNo || '').trim()); }
+    function findProducer(producerNo) { return activeProducers().find(p => p.producerNo === String(producerNo || '').trim()) || null; }
+    function producerLabel(detail) { return [detail.producerNo, detail.producerName].filter(Boolean).join(' '); }
     function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
+    function cleanText(value) { return String(value || '').trim(); }
     function selectedCooler(selectId) { const id = $(selectId).value; return activeCoolers().find(c => c.coolerId === id) || activeCoolers()[0] || null; }
     function placementByLocation() {
       const map = {};
