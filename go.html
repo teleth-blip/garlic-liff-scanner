@@ -39,9 +39,10 @@
 <body>
   <main class="panel">
     <h1>にんにく冷蔵庫を開いています</h1>
-    <p id="message">少し待っても切り替わらない場合は、下のボタンを押してください。</p>
+    <p id="message">下のボタンを押して開いてください。</p>
     <div class="actions">
-      <a id="openLink" href="#">開く</a>
+      <a id="chromeLink" href="#">Chromeで開く</a>
+      <a id="edgeLink" class="secondary" href="#">Edgeで開く</a>
       <a id="normalLink" class="secondary" href="#">通常で開く</a>
     </div>
   </main>
@@ -54,26 +55,44 @@
     if (palletNo) target.searchParams.set('pallet', palletNo);
     if (mode) target.searchParams.set('mode', mode);
     const href = target.toString();
-    const androidIntent = buildAndroidIntent(href);
-    const link = document.getElementById('openLink');
+    const chromeLink = document.getElementById('chromeLink');
+    const edgeLink = document.getElementById('edgeLink');
     const normalLink = document.getElementById('normalLink');
     const isAndroid = /Android/i.test(navigator.userAgent || '');
-    link.href = isAndroid ? androidIntent : href;
-    link.textContent = isAndroid ? 'ブラウザで開く' : '開く';
+    const chromeIntent = buildAndroidIntent(href, 'com.android.chrome');
+    const edgeIntent = buildAndroidIntent(href, 'com.microsoft.emmx');
+    chromeLink.href = isAndroid ? chromeIntent : href;
+    edgeLink.href = isAndroid ? edgeIntent : href;
     normalLink.href = href;
+    chromeLink.addEventListener('click', event => openIntent(event, chromeIntent, href));
+    edgeLink.addEventListener('click', event => openIntent(event, edgeIntent, href));
     document.getElementById('message').textContent = palletNo
-      ? `パレット ${palletNo} の画面を開きます。`
-      : 'にんにく冷蔵庫管理を開きます。';
+      ? `パレット ${palletNo} の画面を開きます。AndroidではChromeで開くを押してください。`
+      : 'にんにく冷蔵庫管理を開きます。AndroidではChromeで開くを押してください。';
     if (!isAndroid) {
       setTimeout(() => {
         location.href = href;
       }, 100);
     }
 
-    function buildAndroidIntent(urlText) {
+    function openIntent(event, intentUrl, fallbackUrl) {
+      if (!isAndroid) return;
+      event.preventDefault();
+      location.href = intentUrl || fallbackUrl;
+    }
+
+    function buildAndroidIntent(urlText, packageName) {
       const url = new URL(urlText);
       const path = `${url.host}${url.pathname}${url.search}`;
-      return `intent://${path}#Intent;scheme=${url.protocol.replace(':', '')};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(location.href)};end`;
+      return [
+        `intent://${path}#Intent`,
+        `scheme=${url.protocol.replace(':', '')}`,
+        'action=android.intent.action.VIEW',
+        'category=android.intent.category.BROWSABLE',
+        `package=${packageName}`,
+        `S.browser_fallback_url=${encodeURIComponent(location.href)}`,
+        'end'
+      ].join(';');
     }
   </script>
 </body>
