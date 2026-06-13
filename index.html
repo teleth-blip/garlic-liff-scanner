@@ -4,36 +4,1647 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>にんにく冷蔵庫管理</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <style>
-    body { margin: 0; padding: 24px; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #17211b; background: #f3f6f4; }
-    .panel { max-width: 560px; margin: 40px auto; padding: 20px; border: 1px solid #d8e0da; border-radius: 8px; background: #fff; }
-    h1 { margin: 0 0 12px; font-size: 22px; }
-    p { line-height: 1.6; }
-    .error { color: #b42318; font-weight: 800; overflow-wrap: anywhere; }
+    :root {
+      --bg: #f3f6f4;
+      --panel: #ffffff;
+      --ink: #17211b;
+      --muted: #647067;
+      --line: #d8e0da;
+      --brand: #176b55;
+      --brand-dark: #0f4f3f;
+      --warn: #b54708;
+      --danger: #b42318;
+      --soft: #eef4f0;
+      --disabled: #e5e7eb;
+      --used: #d9eee6;
+      --selected: #f7d56b;
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 12px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .header-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0;
+      font-size: 21px;
+      letter-spacing: 0;
+    }
+    .worker-bar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    main {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 12px;
+    }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 4px 0 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tab {
+      flex: 0 0 auto;
+      min-height: 44px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .tab.active {
+      color: #fff;
+      background: var(--brand);
+      border-color: var(--brand);
+    }
+    .panel {
+      margin-bottom: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    .hidden { display: none !important; }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 12px 0 8px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+    label {
+      display: grid;
+      gap: 5px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #344139;
+    }
+    input, select, textarea {
+      min-height: 44px;
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #bfcbc4;
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+    button {
+      min-height: 44px;
+      padding: 10px 14px;
+      border: 1px solid var(--brand);
+      border-radius: 8px;
+      background: var(--brand);
+      color: #fff;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    button.secondary {
+      color: var(--ink);
+      background: #fff;
+      border-color: var(--line);
+    }
+    button.danger {
+      background: var(--danger);
+      border-color: var(--danger);
+    }
+    button.small {
+      min-height: 36px;
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      align-items: end;
+    }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .field-with-button {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: end;
+    }
+    .notice {
+      padding: 10px 12px;
+      border: 1px solid #b9d8ca;
+      border-radius: 8px;
+      background: #eef8f3;
+      color: #123d31;
+      font-weight: 700;
+    }
+    .notice.warn {
+      border-color: #f0c48b;
+      background: #fff7ed;
+      color: #7a3f00;
+    }
+    .muted { color: var(--muted); }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 13px;
+    }
+    th {
+      background: #f7faf8;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    td input, td select {
+      min-height: 38px;
+      padding: 6px 8px;
+    }
+    .grid-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: end;
+    }
+    .location-grid {
+      display: grid;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .cell {
+      min-width: 78px;
+      min-height: 56px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+    .cell.available { background: #fff; }
+    .cell.used { background: var(--used); border-color: #91cbb8; }
+    .cell.unavailable { background: var(--disabled); color: #6b7280; border-color: #c7ccd1; }
+    .cell.selected { background: var(--selected); border-color: #af7f00; }
+    .cell .sub {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .pallet-summary {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafcfb;
+    }
+    details.master-section {
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    details.master-section > summary {
+      padding: 12px 14px;
+      font-weight: 900;
+      cursor: pointer;
+      background: #f7faf8;
+    }
+    details.master-section > .master-body {
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .scanner-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, .72);
+    }
+    .scanner-box {
+      width: min(680px, 100%);
+      padding: 12px;
+      border-radius: 8px;
+      background: #fff;
+    }
+    #scannerVideo {
+      width: 100%;
+      max-height: 70vh;
+      border-radius: 8px;
+      background: #111;
+    }
+    #toast {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 200;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: #17211b;
+      color: #fff;
+      font-weight: 800;
+      box-shadow: 0 10px 28px rgba(0,0,0,.2);
+    }
+    #toast.error { background: var(--danger); }
+    .qr-choice-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .qr-choice {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      font-weight: 800;
+    }
+    .qr-choice input {
+      width: 22px;
+      min-height: 22px;
+    }
+    .label-sheet {
+      display: grid;
+      grid-template-columns: repeat(2, 120mm);
+      grid-template-rows: repeat(3, 63mm);
+      width: 240mm;
+      min-height: 189mm;
+      margin: 14px auto;
+      background: #fff;
+    }
+    .qr-label {
+      width: 120mm;
+      height: 63mm;
+      padding: 5mm;
+      border: 1px dashed #c9cfd4;
+      display: grid;
+      grid-template-columns: 47mm 1fr;
+      gap: 4mm;
+      align-items: start;
+      overflow: hidden;
+      break-inside: avoid;
+    }
+    .qr-label.blank { border-color: transparent; }
+    .qr-code svg {
+      width: 47mm;
+      height: 47mm;
+      display: block;
+    }
+    .qr-meta {
+      min-width: 0;
+      font-size: 10px;
+      line-height: 1.22;
+    }
+    .qr-meta .pallet-no {
+      margin-bottom: 2mm;
+      font-size: 18px;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+    .detail-mini {
+      width: 100%;
+      min-width: 0;
+      margin-top: 2mm;
+      border-collapse: collapse;
+    }
+    .detail-mini th, .detail-mini td {
+      padding: 1mm 1.2mm;
+      border: 1px solid #222;
+      font-size: 8.5px;
+      line-height: 1.05;
+    }
+    .detail-mini th { background: #f2f2f2; }
+    @media (min-width: 780px) {
+      .header-row {
+        grid-template-columns: 1fr minmax(360px, 460px);
+        align-items: center;
+      }
+    }
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+      body { background: #fff; }
+      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .action-row, #toast, #scannerPanel {
+        display: none !important;
+      }
+      main { width: 297mm; padding: 0; }
+      #qrPanel {
+        display: block !important;
+        margin: 0;
+        padding: 0;
+        border: none;
+      }
+      .label-sheet {
+        margin: 10.5mm 28.5mm;
+        page-break-after: always;
+      }
+      .qr-label {
+        border: none;
+      }
+    }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
 <body>
-  <main class="panel">
-    <h1>にんにく冷蔵庫管理</h1>
-    <p id="status">画面を読み込んでいます。</p>
+  <header class="app-header">
+    <div class="header-row">
+      <h1>にんにく冷蔵庫管理</h1>
+      <div class="worker-bar">
+        <label>作業者
+          <select id="workerSelect"></select>
+        </label>
+        <button type="button" id="reloadBtn" class="secondary">更新</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="launchPanel" class="panel hidden">
+      <div class="section-title">
+        <h2>QR読取パレット</h2>
+        <span id="launchPalletNo" class="notice"></span>
+      </div>
+      <div class="action-row">
+        <button type="button" data-launch-action="inbound">入庫へ</button>
+        <button type="button" data-launch-action="outbound">出庫へ</button>
+        <button type="button" data-launch-action="move">移動へ</button>
+      </div>
+    </section>
+
+    <nav class="tabs" aria-label="機能">
+      <button type="button" class="tab active" data-tab="register">登録</button>
+      <button type="button" class="tab" data-tab="qr">QR印刷</button>
+      <button type="button" class="tab" data-tab="inbound">入庫</button>
+      <button type="button" class="tab" data-tab="outbound">出庫</button>
+      <button type="button" class="tab" data-tab="move">移動</button>
+      <button type="button" class="tab" data-tab="inventory">配置確認</button>
+      <button type="button" class="tab" data-tab="master">マスタ</button>
+    </nav>
+
+    <section id="registerPanel" class="panel" data-panel="register">
+      <div class="section-title">
+        <h2 id="registerTitle">パレット登録</h2>
+        <button type="button" id="clearRegisterBtn" class="secondary small">入力クリア</button>
+      </div>
+      <div class="form-grid">
+        <label>年産
+          <input id="regYear" inputmode="numeric" autocomplete="off">
+        </label>
+        <label>パレット番号
+          <input id="regPalletNo" placeholder="空欄なら自動採番">
+        </label>
+        <label>重量
+          <input id="regWeight" inputmode="decimal">
+        </label>
+        <label>備考
+          <input id="regMemo">
+        </label>
+      </div>
+      <h3>明細</h3>
+      <div class="table-wrap">
+        <table id="detailTable">
+          <thead><tr><th>生産者番号</th><th>規格</th><th>価格</th><th>備考</th><th></th></tr></thead>
+          <tbody id="detailRows"></tbody>
+        </table>
+      </div>
+      <div class="action-row">
+        <button type="button" id="addDetailBtn" class="secondary">明細追加</button>
+        <button type="button" id="savePalletBtn">登録</button>
+      </div>
+      <h3>登録済みパレット</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>場所</th><th>備考</th><th>操作</th></tr></thead>
+          <tbody id="registeredPalletRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="qrPanel" class="panel hidden" data-panel="qr">
+      <div class="section-title">
+        <h2>QR印刷</h2>
+        <span class="muted">A-one 72206 / A4横 / 2列3行</span>
+      </div>
+      <div class="form-grid">
+        <label>状態で絞り込み
+          <select id="qrStatusFilter">
+            <option value="">すべて</option>
+            <option>未配置</option>
+            <option>保管中</option>
+            <option>仮移動中</option>
+            <option>出庫済</option>
+          </select>
+        </label>
+      </div>
+      <div id="qrChoices" class="qr-choice-list"></div>
+      <div class="action-row">
+        <button type="button" id="clearQrBtn" class="secondary">選択解除</button>
+        <button type="button" id="printBtn">印刷</button>
+      </div>
+      <div id="printArea" class="label-sheet"></div>
+    </section>
+
+    <section id="inboundPanel" class="panel hidden" data-panel="inbound">
+      <div class="section-title"><h2>入庫</h2></div>
+      <div class="grid-controls">
+        <label>冷蔵庫
+          <select id="inCooler"></select>
+        </label>
+        <label>段
+          <select id="inLevel"></select>
+        </label>
+      </div>
+      <div id="inGrid" class="location-grid"></div>
+      <div class="form-grid">
+        <div class="field-with-button">
+          <label>パレット番号
+            <input id="inPalletNo" autocomplete="off">
+          </label>
+          <button type="button" class="secondary" data-scan-target="inPalletNo">読取</button>
+        </div>
+        <label>備考
+          <input id="inMemo">
+        </label>
+      </div>
+      <div id="inPalletSummary" class="pallet-summary hidden"></div>
+      <div class="action-row">
+        <button type="button" id="inboundBtn">入庫登録</button>
+      </div>
+    </section>
+
+    <section id="outboundPanel" class="panel hidden" data-panel="outbound">
+      <div class="section-title"><h2>出庫</h2></div>
+      <div class="form-grid">
+        <div class="field-with-button">
+          <label>パレット番号
+            <input id="outPalletNo" autocomplete="off">
+          </label>
+          <button type="button" class="secondary" data-scan-target="outPalletNo">読取</button>
+        </div>
+        <label>備考
+          <input id="outMemo">
+        </label>
+      </div>
+      <div id="outPalletSummary" class="pallet-summary hidden"></div>
+      <div class="action-row">
+        <button type="button" id="outboundBtn">出庫確定</button>
+      </div>
+    </section>
+
+    <section id="movePanel" class="panel hidden" data-panel="move">
+      <div class="section-title"><h2>移動</h2></div>
+      <h3>仮移動</h3>
+      <div class="form-grid">
+        <div class="field-with-button">
+          <label>動かすパレット番号
+            <input id="moveStartPalletNo" autocomplete="off">
+          </label>
+          <button type="button" class="secondary" data-scan-target="moveStartPalletNo">読取</button>
+        </div>
+        <label>備考
+          <input id="moveStartMemo">
+        </label>
+      </div>
+      <div id="moveStartSummary" class="pallet-summary hidden"></div>
+      <div class="action-row">
+        <button type="button" id="moveStartBtn">仮移動</button>
+      </div>
+      <h3>移動確定</h3>
+      <div class="grid-controls">
+        <label>冷蔵庫
+          <select id="moveCooler"></select>
+        </label>
+        <label>段
+          <select id="moveLevel"></select>
+        </label>
+      </div>
+      <div id="moveGrid" class="location-grid"></div>
+      <div class="form-grid">
+        <div class="field-with-button">
+          <label>確定するパレット番号
+            <input id="moveDonePalletNo" autocomplete="off">
+          </label>
+          <button type="button" class="secondary" data-scan-target="moveDonePalletNo">読取</button>
+        </div>
+        <label>備考
+          <input id="moveDoneMemo">
+        </label>
+      </div>
+      <div id="moveDoneSummary" class="pallet-summary hidden"></div>
+      <div class="action-row">
+        <button type="button" id="moveDoneBtn">移動確定</button>
+      </div>
+    </section>
+
+    <section id="inventoryPanel" class="panel hidden" data-panel="inventory">
+      <div class="section-title"><h2>配置確認</h2></div>
+      <div class="grid-controls">
+        <label>冷蔵庫
+          <select id="checkCooler"></select>
+        </label>
+        <label>段
+          <select id="checkLevel"></select>
+        </label>
+        <label>パレット検索
+          <input id="searchPallet" autocomplete="off">
+        </label>
+      </div>
+      <div id="checkGrid" class="location-grid"></div>
+      <h3>状態別一覧</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>場所</th><th>登録日</th></tr></thead>
+          <tbody id="inventoryRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="masterPanel" class="panel hidden" data-panel="master">
+      <div class="section-title"><h2>マスタ管理</h2></div>
+      <details class="master-section">
+        <summary>規格マスタ</summary>
+        <div class="master-body">
+          <div class="table-wrap">
+            <table><thead><tr><th>ID</th><th>規格名</th><th>表示順</th><th>有効</th><th></th></tr></thead><tbody id="standardRows"></tbody></table>
+          </div>
+          <div class="action-row">
+            <button type="button" id="addStandardBtn" class="secondary">追加</button>
+            <button type="button" id="saveStandardsBtn">保存</button>
+          </div>
+        </div>
+      </details>
+      <details class="master-section">
+        <summary>冷蔵庫マスタ</summary>
+        <div class="master-body">
+          <div class="table-wrap">
+            <table><thead><tr><th>ID</th><th>冷蔵庫名</th><th>最大段</th><th>行</th><th>列</th><th>有効</th><th></th></tr></thead><tbody id="coolerRows"></tbody></table>
+          </div>
+          <div class="action-row">
+            <button type="button" id="addCoolerBtn" class="secondary">追加</button>
+            <button type="button" id="saveCoolersBtn">保存</button>
+          </div>
+        </div>
+      </details>
+      <details class="master-section" open>
+        <summary>保管場所マスタ</summary>
+        <div class="master-body">
+          <div class="grid-controls">
+            <label>冷蔵庫
+              <select id="masterCooler"></select>
+            </label>
+            <label>段
+              <select id="masterLevel"></select>
+            </label>
+          </div>
+          <div id="masterGrid" class="location-grid"></div>
+          <div class="action-row">
+            <button type="button" id="saveLocationsBtn">保管場所保存</button>
+          </div>
+        </div>
+      </details>
+      <details class="master-section">
+        <summary>作業者マスタ</summary>
+        <div class="master-body">
+          <div class="table-wrap">
+            <table><thead><tr><th>ID</th><th>作業者名</th><th>役割</th><th>表示順</th><th>有効</th><th>備考</th><th></th></tr></thead><tbody id="workerRows"></tbody></table>
+          </div>
+          <div class="action-row">
+            <button type="button" id="addWorkerBtn" class="secondary">追加</button>
+            <button type="button" id="saveWorkersBtn">保存</button>
+          </div>
+        </div>
+      </details>
+      <details class="master-section">
+        <summary>操作履歴</summary>
+        <div class="master-body">
+          <div class="table-wrap">
+            <table><thead><tr><th>日時</th><th>作業者</th><th>操作</th><th>パレット</th><th>内容</th><th>備考</th></tr></thead><tbody id="historyRows"></tbody></table>
+          </div>
+        </div>
+      </details>
+    </section>
   </main>
+
+  <div id="scannerPanel" class="scanner-panel hidden">
+    <div class="scanner-box">
+      <video id="scannerVideo" autoplay muted playsinline></video>
+      <div class="action-row">
+        <button type="button" id="stopScanBtn" class="secondary">閉じる</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="hidden"></div>
+
   <script>
-    const UI_GZIP_BASE64 = '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';
-    (async () => {
-      const status = document.getElementById('status');
-      try {
-        if (!window.pako || typeof window.pako.ungzip !== 'function') throw new Error('展開ライブラリを読み込めませんでした。');
-        const bytes = Uint8Array.from(atob(UI_GZIP_BASE64), c => c.charCodeAt(0));
-        const html = new TextDecoder('utf-8').decode(window.pako.ungzip(bytes));
-        document.open();
-        document.write(html);
-        document.close();
-      } catch (error) {
-        status.className = 'error';
-        status.textContent = '画面を読み込めませんでした: ' + (error && error.message ? error.message : error);
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwV9IecaDNZL6sfojQxGZjZ4wlS19nzJkWJi4ZkiaCnNlLx8yoD1UzgQbAcMgPErwt3DA/exec';
+    const APP_HOME_URL = location.origin + location.pathname;
+    const state = {
+      data: null,
+      workerId: localStorage.getItem('garlic.workerId') || '',
+      tab: 'register',
+      editPalletNo: '',
+      selectedLocations: { inbound: '', move: '' },
+      qrSelected: new Set(),
+      masterDraftKey: '',
+      masterUnavailable: new Set(),
+      scanner: null,
+      apiBridge: {
+        frame: null,
+        ready: false,
+        readyPromise: null,
+        readyResolve: null,
+        readyReject: null,
+        pending: {}
+      },
+      launch: getLaunchParams()
+    };
+
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const num = value => Number(value || 0).toLocaleString('ja-JP');
+
+    window.addEventListener('message', handleApiBridgeMessage);
+    document.addEventListener('DOMContentLoaded', init);
+
+    async function init() {
+      bindEvents();
+      setDefaultYear();
+      if (state.launch.palletNo) {
+        $('launchPanel').classList.remove('hidden');
+        $('launchPalletNo').textContent = state.launch.palletNo;
       }
-    })();
+      await refreshAll();
+      if (state.launch.palletNo && state.launch.mode) applyLaunchAction(state.launch.mode);
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
+      document.querySelectorAll('[data-launch-action]').forEach(btn => btn.addEventListener('click', () => applyLaunchAction(btn.dataset.launchAction)));
+      document.querySelectorAll('[data-scan-target]').forEach(btn => btn.addEventListener('click', () => startScanner(btn.dataset.scanTarget)));
+      $('reloadBtn').addEventListener('click', refreshAll);
+      $('workerSelect').addEventListener('change', () => {
+        state.workerId = $('workerSelect').value;
+        localStorage.setItem('garlic.workerId', state.workerId);
+      });
+      $('clearRegisterBtn').addEventListener('click', clearRegisterForm);
+      $('addDetailBtn').addEventListener('click', () => addDetailRow());
+      $('savePalletBtn').addEventListener('click', savePallet);
+      $('qrStatusFilter').addEventListener('change', renderQrChoices);
+      $('clearQrBtn').addEventListener('click', () => { state.qrSelected.clear(); renderQrChoices(); renderPrintArea(); });
+      $('printBtn').addEventListener('click', () => window.print());
+      $('inCooler').addEventListener('change', () => { renderLevelOptions('inLevel', selectedCooler('inCooler')); state.selectedLocations.inbound = ''; renderInboundGrid(); });
+      $('inLevel').addEventListener('change', () => { state.selectedLocations.inbound = ''; renderInboundGrid(); });
+      $('inPalletNo').addEventListener('input', () => renderActionPallet('in'));
+      $('inboundBtn').addEventListener('click', recordInbound);
+      $('outPalletNo').addEventListener('input', () => renderActionPallet('out'));
+      $('outboundBtn').addEventListener('click', recordOutbound);
+      $('moveStartPalletNo').addEventListener('input', () => renderActionPallet('moveStart'));
+      $('moveStartBtn').addEventListener('click', startMove);
+      $('moveCooler').addEventListener('change', () => { renderLevelOptions('moveLevel', selectedCooler('moveCooler')); state.selectedLocations.move = ''; renderMoveGrid(); });
+      $('moveLevel').addEventListener('change', () => { state.selectedLocations.move = ''; renderMoveGrid(); });
+      $('moveDonePalletNo').addEventListener('input', () => renderActionPallet('moveDone'));
+      $('moveDoneBtn').addEventListener('click', completeMove);
+      $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
+      $('checkLevel').addEventListener('change', renderCheckGrid);
+      $('searchPallet').addEventListener('input', renderInventoryRows);
+      $('addStandardBtn').addEventListener('click', addStandardRow);
+      $('saveStandardsBtn').addEventListener('click', saveStandards);
+      $('addCoolerBtn').addEventListener('click', addCoolerRow);
+      $('saveCoolersBtn').addEventListener('click', saveCoolers);
+      $('masterCooler').addEventListener('change', () => { renderLevelOptions('masterLevel', selectedCooler('masterCooler')); loadMasterDraft(); renderMasterGrid(); });
+      $('masterLevel').addEventListener('change', () => { loadMasterDraft(); renderMasterGrid(); });
+      $('saveLocationsBtn').addEventListener('click', saveLocations);
+      $('addWorkerBtn').addEventListener('click', addWorkerRow);
+      $('saveWorkersBtn').addEventListener('click', saveWorkers);
+      $('stopScanBtn').addEventListener('click', stopScanner);
+    }
+
+    async function refreshAll() {
+      try {
+        showToast('データを読み込んでいます。');
+        const data = await api('getAppData');
+        state.data = data;
+        ensureWorkerSelection();
+        renderAll();
+        showToast('読み込みました。');
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    function renderAll() {
+      if (!state.data) return;
+      renderWorkers();
+      renderSelectors();
+      if (!state.editPalletNo && !$('detailRows').children.length) addDetailRow();
+      renderRegisterTable();
+      renderQrChoices();
+      renderPrintArea();
+      renderInboundGrid();
+      renderMoveGrid();
+      renderCheckGrid();
+      renderInventoryRows();
+      renderMaster();
+      renderActionPallet('in');
+      renderActionPallet('out');
+      renderActionPallet('moveStart');
+      renderActionPallet('moveDone');
+    }
+
+    function setTab(tab) {
+      state.tab = tab;
+      document.querySelectorAll('[data-tab]').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+      document.querySelectorAll('[data-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.panel !== tab));
+    }
+
+    function getLaunchParams() {
+      const params = new URLSearchParams(location.search);
+      return {
+        palletNo: params.get('pallet') || params.get('palletNo') || params.get('p') || params.get('qr') || '',
+        mode: params.get('mode') || params.get('action') || ''
+      };
+    }
+
+    function applyLaunchAction(action) {
+      const palletNo = state.launch.palletNo;
+      if (!palletNo) return;
+      if (action === 'inbound') {
+        $('inPalletNo').value = palletNo;
+        setTab('inbound');
+        renderActionPallet('in');
+      } else if (action === 'outbound') {
+        $('outPalletNo').value = palletNo;
+        setTab('outbound');
+        renderActionPallet('out');
+      } else {
+        const pallet = findPallet(palletNo);
+        if (pallet && pallet.status === '仮移動中') $('moveDonePalletNo').value = palletNo;
+        else $('moveStartPalletNo').value = palletNo;
+        setTab('move');
+        renderActionPallet('moveStart');
+        renderActionPallet('moveDone');
+      }
+    }
+
+    function setDefaultYear() {
+      $('regYear').value = String(new Date().getFullYear());
+    }
+
+    function ensureWorkerSelection() {
+      const workers = activeWorkers();
+      if (!state.workerId || !workers.some(w => w.workerId === state.workerId)) {
+        state.workerId = workers[0] ? workers[0].workerId : '';
+        if (state.workerId) localStorage.setItem('garlic.workerId', state.workerId);
+      }
+    }
+
+    function renderWorkers() {
+      $('workerSelect').innerHTML = activeWorkers().map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}（${esc(w.workerId)}）</option>`).join('');
+      $('workerSelect').value = state.workerId;
+    }
+
+    function renderSelectors() {
+      ['inCooler', 'moveCooler', 'checkCooler', 'masterCooler'].forEach(id => renderCoolerOptions(id));
+      renderLevelOptions('inLevel', selectedCooler('inCooler'));
+      renderLevelOptions('moveLevel', selectedCooler('moveCooler'));
+      renderLevelOptions('checkLevel', selectedCooler('checkCooler'));
+      renderLevelOptions('masterLevel', selectedCooler('masterCooler'));
+      if (!state.masterDraftKey) loadMasterDraft();
+    }
+
+    function renderCoolerOptions(id) {
+      const select = $(id);
+      const previous = select.value;
+      const coolers = activeCoolers();
+      select.innerHTML = coolers.map(c => `<option value="${esc(c.coolerId)}">${esc(c.coolerName)}（${esc(c.coolerId)}）</option>`).join('');
+      if (coolers.some(c => c.coolerId === previous)) select.value = previous;
+    }
+
+    function renderLevelOptions(id, cooler) {
+      const select = $(id);
+      const previous = select.value || '1';
+      const max = cooler ? Number(cooler.maxLevel || 1) : 1;
+      select.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}段目</option>`).join('');
+      select.value = Number(previous) <= max ? previous : '1';
+    }
+
+    function renderRegisterTable() {
+      $('registeredPalletRows').innerHTML = sortedPallets().map(p => `
+        <tr>
+          <td>${esc(p.palletNo)}</td>
+          <td>${esc(p.status)}</td>
+          <td>${num(p.weight)}</td>
+          <td>${esc(p.currentLocationName || '')}</td>
+          <td>${esc(p.memo || '')}</td>
+          <td>
+            <button type="button" class="secondary small" data-edit-pallet="${esc(p.palletNo)}">編集</button>
+            <button type="button" class="danger small" data-delete-pallet="${esc(p.palletNo)}">削除</button>
+          </td>
+        </tr>
+      `).join('');
+      document.querySelectorAll('[data-edit-pallet]').forEach(btn => btn.addEventListener('click', () => editPallet(btn.dataset.editPallet)));
+      document.querySelectorAll('[data-delete-pallet]').forEach(btn => btn.addEventListener('click', () => deletePallet(btn.dataset.deletePallet)));
+    }
+
+    function addDetailRow(data = {}) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input data-detail="producerNo" value="${esc(data.producerNo || '')}"></td>
+        <td><select data-detail="standard">${standardOptions(data.standard || '')}</select></td>
+        <td><input data-detail="price" inputmode="decimal" value="${esc(data.price || '')}"></td>
+        <td><input data-detail="memo" value="${esc(data.memo || '')}"></td>
+        <td><button type="button" class="secondary small">削除</button></td>
+      `;
+      tr.querySelector('button').addEventListener('click', () => tr.remove());
+      $('detailRows').appendChild(tr);
+    }
+
+    function standardOptions(selected) {
+      return activeStandards().map(s => `<option value="${esc(s.standardName)}" ${s.standardName === selected ? 'selected' : ''}>${esc(s.standardName)}</option>`).join('');
+    }
+
+    function clearRegisterForm() {
+      state.editPalletNo = '';
+      $('registerTitle').textContent = 'パレット登録';
+      $('savePalletBtn').textContent = '登録';
+      $('regPalletNo').disabled = false;
+      $('regPalletNo').value = '';
+      $('regWeight').value = '';
+      $('regMemo').value = '';
+      setDefaultYear();
+      $('detailRows').innerHTML = '';
+      addDetailRow();
+    }
+
+    function editPallet(palletNo) {
+      const pallet = findPallet(palletNo);
+      if (!pallet) return;
+      state.editPalletNo = palletNo;
+      $('registerTitle').textContent = `パレット編集 ${palletNo}`;
+      $('savePalletBtn').textContent = '変更保存';
+      $('regYear').value = pallet.productionYear || String(new Date().getFullYear());
+      $('regPalletNo').value = pallet.palletNo;
+      $('regPalletNo').disabled = true;
+      $('regWeight').value = pallet.weight || '';
+      $('regMemo').value = pallet.memo || '';
+      $('detailRows').innerHTML = '';
+      detailsFor(palletNo).forEach(addDetailRow);
+      if (!$('detailRows').children.length) addDetailRow();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function savePallet() {
+      try {
+        const payload = {
+          productionYear: $('regYear').value,
+          palletNo: $('regPalletNo').value,
+          weight: $('regWeight').value,
+          memo: $('regMemo').value,
+          details: collectDetails()
+        };
+        const method = state.editPalletNo ? 'updatePallet' : 'registerPallet';
+        if (state.editPalletNo) payload.palletNo = state.editPalletNo;
+        const res = await api(method, payload);
+        applyDataResponse(res);
+        clearRegisterForm();
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    function collectDetails() {
+      return Array.from($('detailRows').querySelectorAll('tr')).map(tr => ({
+        producerNo: tr.querySelector('[data-detail="producerNo"]').value,
+        standard: tr.querySelector('[data-detail="standard"]').value,
+        price: tr.querySelector('[data-detail="price"]').value,
+        memo: tr.querySelector('[data-detail="memo"]').value
+      })).filter(r => r.producerNo || r.standard || r.price || r.memo);
+    }
+
+    async function deletePallet(palletNo) {
+      if (!confirm(`${palletNo} を削除しますか。`)) return;
+      try {
+        const res = await api('deletePallet', { palletNo });
+        applyDataResponse(res);
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    function renderQrChoices() {
+      const filter = $('qrStatusFilter').value;
+      const pallets = sortedPallets().filter(p => !filter || p.status === filter);
+      $('qrChoices').innerHTML = pallets.map(p => `
+        <label class="qr-choice">
+          <input type="checkbox" value="${esc(p.palletNo)}" ${state.qrSelected.has(p.palletNo) ? 'checked' : ''}>
+          <span>${esc(p.palletNo)} / ${esc(p.status)} / ${num(p.weight)}kg</span>
+        </label>
+      `).join('');
+      $('qrChoices').querySelectorAll('input').forEach(input => input.addEventListener('change', () => {
+        if (input.checked) {
+          if (state.qrSelected.size >= 6) {
+            input.checked = false;
+            showToast('1枚に印刷できるのは6パレットまでです。', true);
+            return;
+          }
+          state.qrSelected.add(input.value);
+        } else {
+          state.qrSelected.delete(input.value);
+        }
+        renderPrintArea();
+      }));
+    }
+
+    function renderPrintArea() {
+      const selected = Array.from(state.qrSelected).slice(0, 6).map(findPallet).filter(Boolean);
+      const labels = [];
+      for (let i = 0; i < 6; i++) labels.push(selected[i] ? qrLabelHtml(selected[i]) : '<div class="qr-label blank"></div>');
+      $('printArea').innerHTML = labels.join('');
+    }
+
+    function qrLabelHtml(pallet) {
+      const details = detailsFor(pallet.palletNo);
+      return `
+        <div class="qr-label">
+          <div class="qr-code">${qrSvg(launchUrl(pallet.palletNo))}</div>
+          <div class="qr-meta">
+            <div class="pallet-no">${esc(pallet.palletNo)}</div>
+            <div>重量 ${num(pallet.weight)}kg</div>
+            ${details.length ? detailMiniTable(details) : '<div>明細なし</div>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function detailMiniTable(details) {
+      return `<table class="detail-mini"><thead><tr><th>生産者</th><th>規格</th><th>価格</th></tr></thead><tbody>${
+        details.map(d => `<tr><td>${esc(d.producerNo)}</td><td>${esc(d.standard)}</td><td>${num(d.price)}</td></tr>`).join('')
+      }</tbody></table>`;
+    }
+
+    function qrSvg(text) {
+      if (!window.qrcode) return `<div>${esc(text)}</div>`;
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      return qr.createSvgTag(5, 1);
+    }
+
+    function launchUrl(palletNo) {
+      const url = new URL(APP_HOME_URL);
+      url.searchParams.set('pallet', palletNo);
+      return url.toString();
+    }
+
+    function renderInboundGrid() {
+      renderSelectableGrid('inGrid', selectedCooler('inCooler'), Number($('inLevel').value || 1), 'inbound');
+    }
+
+    function renderMoveGrid() {
+      renderSelectableGrid('moveGrid', selectedCooler('moveCooler'), Number($('moveLevel').value || 1), 'move');
+    }
+
+    function renderSelectableGrid(containerId, cooler, level, kind) {
+      const container = $(containerId);
+      if (!cooler) {
+        container.innerHTML = '<div class="notice warn">冷蔵庫マスタに有効な冷蔵庫がありません。</div>';
+        return;
+      }
+      const placement = placementByLocation();
+      const locations = locationMatrix(cooler, level);
+      container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
+      container.innerHTML = locations.map(loc => {
+        const placed = placement[loc.locationId];
+        const selected = state.selectedLocations[kind] === loc.locationId;
+        const cls = !loc.available ? 'unavailable' : placed ? 'used' : selected ? 'selected' : 'available';
+        const label = placed ? placed.palletNo : loc.available ? (loc.displayName || `${loc.row}-${loc.col}`) : '使用不可';
+        return `<button type="button" class="cell ${cls}" data-location="${esc(loc.locationId)}" ${(!loc.available || placed) ? 'disabled' : ''}>${esc(label)}<span class="sub">${esc(loc.locationId)}</span></button>`;
+      }).join('');
+      container.querySelectorAll('[data-location]').forEach(btn => btn.addEventListener('click', () => {
+        state.selectedLocations[kind] = btn.dataset.location;
+        kind === 'inbound' ? renderInboundGrid() : renderMoveGrid();
+      }));
+    }
+
+    function renderCheckGrid() {
+      const cooler = selectedCooler('checkCooler');
+      const level = Number($('checkLevel').value || 1);
+      const container = $('checkGrid');
+      if (!cooler) {
+        container.innerHTML = '<div class="notice warn">冷蔵庫マスタに有効な冷蔵庫がありません。</div>';
+        return;
+      }
+      const placement = placementByLocation();
+      const locations = locationMatrix(cooler, level);
+      container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
+      container.innerHTML = locations.map(loc => {
+        const placed = placement[loc.locationId];
+        const cls = !loc.available ? 'unavailable' : placed ? 'used' : 'available';
+        const label = placed ? placed.palletNo : loc.available ? '空き' : '使用不可';
+        return `<div class="cell ${cls}">${esc(label)}<span class="sub">${esc(loc.displayName || loc.locationId)}</span></div>`;
+      }).join('');
+    }
+
+    function renderActionPallet(kind) {
+      const map = {
+        in: ['inPalletNo', 'inPalletSummary'],
+        out: ['outPalletNo', 'outPalletSummary'],
+        moveStart: ['moveStartPalletNo', 'moveStartSummary'],
+        moveDone: ['moveDonePalletNo', 'moveDoneSummary']
+      };
+      const [inputId, summaryId] = map[kind];
+      const pallet = findPallet($(inputId).value.trim());
+      const el = $(summaryId);
+      if (!pallet) {
+        el.classList.add('hidden');
+        el.innerHTML = '';
+        return;
+      }
+      el.classList.remove('hidden');
+      el.innerHTML = `
+        <div><strong>${esc(pallet.palletNo)}</strong> / ${esc(pallet.status)} / ${num(pallet.weight)}kg</div>
+        <div>場所: ${esc(pallet.currentLocationName || pallet.currentLocationId || '未配置')}</div>
+        <div>備考: ${esc(pallet.memo || '')}</div>
+      `;
+    }
+
+    async function recordInbound() {
+      try {
+        const res = await api('recordInbound', {
+          palletNo: $('inPalletNo').value,
+          locationId: state.selectedLocations.inbound,
+          memo: $('inMemo').value
+        });
+        applyDataResponse(res);
+        $('inPalletNo').value = '';
+        $('inMemo').value = '';
+        state.selectedLocations.inbound = '';
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    async function recordOutbound() {
+      try {
+        const res = await api('recordOutbound', { palletNo: $('outPalletNo').value, memo: $('outMemo').value });
+        applyDataResponse(res);
+        $('outPalletNo').value = '';
+        $('outMemo').value = '';
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    async function startMove() {
+      try {
+        const res = await api('startMove', { palletNo: $('moveStartPalletNo').value, memo: $('moveStartMemo').value });
+        applyDataResponse(res);
+        $('moveDonePalletNo').value = $('moveStartPalletNo').value;
+        $('moveStartPalletNo').value = '';
+        $('moveStartMemo').value = '';
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    async function completeMove() {
+      try {
+        const res = await api('completeMove', {
+          palletNo: $('moveDonePalletNo').value,
+          locationId: state.selectedLocations.move,
+          memo: $('moveDoneMemo').value
+        });
+        applyDataResponse(res);
+        $('moveDonePalletNo').value = '';
+        $('moveDoneMemo').value = '';
+        state.selectedLocations.move = '';
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    function renderInventoryRows() {
+      const q = $('searchPallet').value.trim();
+      $('inventoryRows').innerHTML = sortedPallets().filter(p => !q || p.palletNo.includes(q)).map(p => `
+        <tr><td>${esc(p.palletNo)}</td><td>${esc(p.status)}</td><td>${num(p.weight)}</td><td>${esc(p.currentLocationName || '')}</td><td>${esc(p.registeredAt || '')}</td></tr>
+      `).join('');
+    }
+
+    function renderMaster() {
+      renderStandardRows();
+      renderCoolerRows();
+      renderWorkerRows();
+      renderHistoryRows();
+      renderMasterGrid();
+    }
+
+    function renderStandardRows() {
+      $('standardRows').innerHTML = state.data.master.standards.map(row => standardRowHtml(row)).join('');
+      bindRemoveButtons('standardRows');
+    }
+
+    function standardRowHtml(row = {}) {
+      return `<tr>
+        <td><input data-field="standardId" value="${esc(row.standardId || '')}"></td>
+        <td><input data-field="standardName" value="${esc(row.standardName || '')}"></td>
+        <td><input data-field="displayOrder" inputmode="numeric" value="${esc(row.displayOrder || '')}"></td>
+        <td><input data-field="active" type="checkbox" ${row.active !== false ? 'checked' : ''}></td>
+        <td><button type="button" class="secondary small" data-remove-row>削除</button></td>
+      </tr>`;
+    }
+
+    function addStandardRow() {
+      $('standardRows').insertAdjacentHTML('beforeend', standardRowHtml({ displayOrder: nextOrder(state.data.master.standards), active: true }));
+      bindRemoveButtons('standardRows');
+    }
+
+    async function saveStandards() {
+      await saveRows('saveStandards', 'standardRows');
+    }
+
+    function renderCoolerRows() {
+      $('coolerRows').innerHTML = state.data.master.coolers.map(row => coolerRowHtml(row)).join('');
+      bindRemoveButtons('coolerRows');
+    }
+
+    function coolerRowHtml(row = {}) {
+      return `<tr>
+        <td><input data-field="coolerId" value="${esc(row.coolerId || '')}"></td>
+        <td><input data-field="coolerName" value="${esc(row.coolerName || '')}"></td>
+        <td><input data-field="maxLevel" inputmode="numeric" value="${esc(row.maxLevel || 1)}"></td>
+        <td><input data-field="rowCount" inputmode="numeric" value="${esc(row.rowCount || 1)}"></td>
+        <td><input data-field="colCount" inputmode="numeric" value="${esc(row.colCount || 1)}"></td>
+        <td><input data-field="active" type="checkbox" ${row.active !== false ? 'checked' : ''}></td>
+        <td><button type="button" class="secondary small" data-remove-row>削除</button></td>
+      </tr>`;
+    }
+
+    function addCoolerRow() {
+      $('coolerRows').insertAdjacentHTML('beforeend', coolerRowHtml({ maxLevel: 1, rowCount: 1, colCount: 1, active: true }));
+      bindRemoveButtons('coolerRows');
+    }
+
+    async function saveCoolers() {
+      await saveRows('saveCoolers', 'coolerRows');
+    }
+
+    function loadMasterDraft() {
+      const cooler = selectedCooler('masterCooler');
+      const level = Number($('masterLevel').value || 1);
+      if (!cooler) return;
+      state.masterDraftKey = `${cooler.coolerId}:${level}`;
+      state.masterUnavailable = new Set(state.data.master.locations
+        .filter(loc => loc.coolerId === cooler.coolerId && Number(loc.level) === level && !loc.available)
+        .map(loc => `${loc.row}-${loc.col}`));
+    }
+
+    function renderMasterGrid() {
+      const cooler = selectedCooler('masterCooler');
+      const level = Number($('masterLevel').value || 1);
+      const container = $('masterGrid');
+      if (!cooler) {
+        container.innerHTML = '<div class="notice warn">冷蔵庫マスタに有効な冷蔵庫がありません。</div>';
+        return;
+      }
+      const key = `${cooler.coolerId}:${level}`;
+      if (state.masterDraftKey !== key) loadMasterDraft();
+      const placement = placementByLocation();
+      container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
+      const cells = [];
+      for (let row = 1; row <= Number(cooler.rowCount); row++) {
+        for (let col = 1; col <= Number(cooler.colCount); col++) {
+          const locId = makeLocationId(cooler.coolerId, level, row, col);
+          const unavailable = state.masterUnavailable.has(`${row}-${col}`);
+          const placed = placement[locId];
+          const cls = placed ? 'used' : unavailable ? 'unavailable' : 'available';
+          const label = placed ? placed.palletNo : unavailable ? '使用不可' : '使用可';
+          cells.push(`<button type="button" class="cell ${cls}" data-master-cell="${row}-${col}" ${placed ? 'disabled' : ''}>${esc(label)}<span class="sub">R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}</span></button>`);
+        }
+      }
+      container.innerHTML = cells.join('');
+      container.querySelectorAll('[data-master-cell]').forEach(btn => btn.addEventListener('click', () => {
+        const key = btn.dataset.masterCell;
+        if (state.masterUnavailable.has(key)) state.masterUnavailable.delete(key);
+        else state.masterUnavailable.add(key);
+        renderMasterGrid();
+      }));
+    }
+
+    async function saveLocations() {
+      try {
+        const cooler = selectedCooler('masterCooler');
+        const level = Number($('masterLevel').value || 1);
+        if (!cooler) throw new Error('冷蔵庫を選択してください。');
+        const cells = [];
+        for (let row = 1; row <= Number(cooler.rowCount); row++) {
+          for (let col = 1; col <= Number(cooler.colCount); col++) {
+            cells.push({ row, col, available: !state.masterUnavailable.has(`${row}-${col}`) });
+          }
+        }
+        const res = await api('saveLocationGrid', { coolerId: cooler.coolerId, level, cells });
+        applyDataResponse(res);
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    function renderWorkerRows() {
+      $('workerRows').innerHTML = state.data.master.workers.map(row => workerRowHtml(row)).join('');
+      bindRemoveButtons('workerRows');
+    }
+
+    function workerRowHtml(row = {}) {
+      return `<tr>
+        <td><input data-field="workerId" value="${esc(row.workerId || '')}"></td>
+        <td><input data-field="workerName" value="${esc(row.workerName || '')}"></td>
+        <td><select data-field="role">
+          <option value="admin" ${row.role === 'admin' ? 'selected' : ''}>admin</option>
+          <option value="operator" ${row.role === 'operator' || !row.role ? 'selected' : ''}>operator</option>
+          <option value="viewer" ${row.role === 'viewer' ? 'selected' : ''}>viewer</option>
+        </select></td>
+        <td><input data-field="displayOrder" inputmode="numeric" value="${esc(row.displayOrder || '')}"></td>
+        <td><input data-field="active" type="checkbox" ${row.active !== false ? 'checked' : ''}></td>
+        <td><input data-field="note" value="${esc(row.note || '')}"></td>
+        <td><button type="button" class="secondary small" data-remove-row>削除</button></td>
+      </tr>`;
+    }
+
+    function addWorkerRow() {
+      $('workerRows').insertAdjacentHTML('beforeend', workerRowHtml({ role: 'operator', displayOrder: nextOrder(state.data.master.workers), active: true }));
+      bindRemoveButtons('workerRows');
+    }
+
+    async function saveWorkers() {
+      await saveRows('saveWorkers', 'workerRows');
+    }
+
+    function renderHistoryRows() {
+      $('historyRows').innerHTML = (state.data.histories || []).map(h => `
+        <tr><td>${esc(h.at)}</td><td>${esc(h.workerName || h.workerId)}</td><td>${esc(h.action)}</td><td>${esc(h.palletNo)}</td><td>${esc(h.content)}</td><td>${esc(h.memo)}</td></tr>
+      `).join('');
+    }
+
+    async function saveRows(method, tbodyId) {
+      try {
+        const rows = Array.from($(tbodyId).querySelectorAll('tr')).map(tr => {
+          const row = {};
+          tr.querySelectorAll('[data-field]').forEach(input => {
+            row[input.dataset.field] = input.type === 'checkbox' ? input.checked : input.value;
+          });
+          return row;
+        });
+        const res = await api(method, { rows });
+        applyDataResponse(res);
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    function bindRemoveButtons(tbodyId) {
+      $(tbodyId).querySelectorAll('[data-remove-row]').forEach(btn => btn.onclick = () => btn.closest('tr').remove());
+    }
+
+    function nextOrder(rows) {
+      return (rows || []).reduce((max, row) => Math.max(max, Number(row.displayOrder || 0)), 0) + 10;
+    }
+
+    function applyDataResponse(res) {
+      if (res && res.master) {
+        state.data = res;
+        ensureWorkerSelection();
+        renderAll();
+      }
+      showToast(res && res.message ? res.message : '保存しました。');
+    }
+
+    async function api(method, payload = {}) {
+      try {
+        return await apiViaBridge(method, payload);
+      } catch (error) {
+        if (error.requestSent && method !== 'getAppData' && method !== 'ping') throw error;
+        return apiViaJsonp(method, payload);
+      }
+    }
+
+    function apiViaBridge(method, payload = {}) {
+      return ensureApiBridge().then(() => new Promise((resolve, reject) => {
+        const id = `bridge_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const timer = setTimeout(() => {
+          delete state.apiBridge.pending[id];
+          const error = new Error('Apps Script APIが応答しませんでした。');
+          error.requestSent = true;
+          reject(error);
+        }, 45000);
+        state.apiBridge.pending[id] = { resolve, reject, timer };
+        try {
+          state.apiBridge.frame.contentWindow.postMessage({
+            type: 'garlic-api-request',
+            id,
+            request: { method, workerId: state.workerId, payload }
+          }, '*');
+        } catch (error) {
+          clearTimeout(timer);
+          delete state.apiBridge.pending[id];
+          error.bridgeUnavailable = true;
+          reject(error);
+        }
+      }));
+    }
+
+    function ensureApiBridge() {
+      if (state.apiBridge.ready) return Promise.resolve();
+      if (state.apiBridge.readyPromise) return state.apiBridge.readyPromise;
+      state.apiBridge.readyPromise = new Promise((resolve, reject) => {
+        state.apiBridge.readyResolve = resolve;
+        state.apiBridge.readyReject = reject;
+        const timer = setTimeout(() => {
+          if (state.apiBridge.ready) return;
+          const error = new Error('Apps Script通信フレームを起動できませんでした。');
+          error.bridgeUnavailable = true;
+          reject(error);
+        }, 9000);
+        const frame = document.createElement('iframe');
+        frame.hidden = true;
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.display = 'none';
+        frame.src = `${GAS_API_URL}?bridge=1&parent=${encodeURIComponent(location.origin)}&_=${Date.now()}`;
+        frame.onerror = () => {
+          clearTimeout(timer);
+          const error = new Error('Apps Script通信フレームを読み込めませんでした。');
+          error.bridgeUnavailable = true;
+          reject(error);
+        };
+        state.apiBridge.frame = frame;
+        state.apiBridge.readyTimer = timer;
+        document.body.appendChild(frame);
+      });
+      return state.apiBridge.readyPromise;
+    }
+
+    function handleApiBridgeMessage(event) {
+      if (!isApiBridgeOrigin(event.origin)) return;
+      const message = event.data || {};
+      if (message.type === 'garlic-api-ready') {
+        state.apiBridge.ready = true;
+        if (state.apiBridge.readyTimer) clearTimeout(state.apiBridge.readyTimer);
+        if (state.apiBridge.readyResolve) state.apiBridge.readyResolve();
+        return;
+      }
+      if (message.type !== 'garlic-api-response') return;
+      const pending = state.apiBridge.pending[message.id];
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      delete state.apiBridge.pending[message.id];
+      const response = message.response;
+      if (!response || response.ok === false) {
+        pending.reject(new Error(response && response.error ? response.error : 'APIエラーです。'));
+      } else {
+        pending.resolve(response);
+      }
+    }
+
+    function isApiBridgeOrigin(origin) {
+      return origin === 'https://script.google.com' || /\.googleusercontent\.com$/.test(origin);
+    }
+
+    function apiViaJsonp(method, payload = {}) {
+      return new Promise((resolve, reject) => {
+        window.__garlicApiCallbacks = window.__garlicApiCallbacks || {};
+        const id = `cb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const cbName = `__garlicApiCallbacks.${id}`;
+        const url = new URL(GAS_API_URL);
+        url.searchParams.set('api', '1');
+        url.searchParams.set('method', method);
+        url.searchParams.set('callback', cbName);
+        url.searchParams.set('_', String(Date.now()));
+        if (state.workerId) url.searchParams.set('workerId', state.workerId);
+        if (payload && Object.keys(payload).length) url.searchParams.set('payload', JSON.stringify(payload));
+        if (url.toString().length > 18000) {
+          reject(new Error('送信内容が大きすぎます。分割して保存してください。'));
+          return;
+        }
+        const script = document.createElement('script');
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error('Apps Script APIが応答しませんでした。'));
+        }, 30000);
+        function cleanup() {
+          clearTimeout(timer);
+          delete window.__garlicApiCallbacks[id];
+          script.remove();
+        }
+        window.__garlicApiCallbacks[id] = response => {
+          cleanup();
+          if (!response || response.ok === false) reject(new Error(response && response.error ? response.error : 'APIエラーです。'));
+          else resolve(response);
+        };
+        script.onerror = () => {
+          cleanup();
+          reject(new Error('Apps Script APIを読み込めませんでした。'));
+        };
+        script.src = url.toString();
+        document.head.appendChild(script);
+      });
+    }
+
+    async function startScanner(targetId) {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('このブラウザではカメラを直接起動できません。');
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        const video = $('scannerVideo');
+        video.srcObject = stream;
+        await video.play();
+        $('scannerPanel').classList.remove('hidden');
+        let detector = null;
+        if ('BarcodeDetector' in window) {
+          try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; }
+        }
+        state.scanner = { targetId, stream, detector, active: true, canvas: document.createElement('canvas'), raf: 0 };
+        scanLoop();
+      } catch (error) {
+        showToast(error.message || 'カメラを起動できませんでした。', true);
+      }
+    }
+
+    async function scanLoop() {
+      if (!state.scanner || !state.scanner.active) return;
+      const video = $('scannerVideo');
+      try {
+        let text = '';
+        if (state.scanner.detector) {
+          const codes = await state.scanner.detector.detect(video);
+          if (codes && codes.length) text = codes[0].rawValue || '';
+        }
+        if (!text && window.jsQR && video.videoWidth && video.videoHeight) {
+          const canvas = state.scanner.canvas;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
+          if (code && code.data) text = code.data;
+        }
+        if (text) {
+          const palletNo = extractPalletNo(text);
+          $(state.scanner.targetId).value = palletNo;
+          $(state.scanner.targetId).dispatchEvent(new Event('input'));
+          stopScanner();
+          showToast(`読み取りました: ${palletNo}`);
+          return;
+        }
+      } catch (error) {
+        console.warn(error);
+      }
+      if (state.scanner && state.scanner.active) state.scanner.raf = requestAnimationFrame(scanLoop);
+    }
+
+    function stopScanner() {
+      if (state.scanner) {
+        state.scanner.active = false;
+        if (state.scanner.raf) cancelAnimationFrame(state.scanner.raf);
+        if (state.scanner.stream) state.scanner.stream.getTracks().forEach(track => track.stop());
+      }
+      state.scanner = null;
+      $('scannerVideo').srcObject = null;
+      $('scannerPanel').classList.add('hidden');
+    }
+
+    function extractPalletNo(text) {
+      const raw = String(text || '').trim();
+      try {
+        const url = new URL(raw);
+        const value = url.searchParams.get('pallet') || url.searchParams.get('palletNo') || url.searchParams.get('p') || url.searchParams.get('qr');
+        if (value) return value.trim();
+      } catch (e) {}
+      const match = raw.match(/\d{4}-\d{1,}/);
+      return match ? `${match[0].slice(0, 5)}${match[0].slice(5).padStart(4, '0')}` : raw;
+    }
+
+    function showToast(message, isError = false) {
+      const toast = $('toast');
+      toast.textContent = message;
+      toast.classList.toggle('error', !!isError);
+      toast.classList.remove('hidden');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.add('hidden'), isError ? 5200 : 2400);
+    }
+
+    function activeWorkers() { return state.data ? state.data.master.workers.filter(w => w.active) : []; }
+    function activeCoolers() { return state.data ? state.data.master.coolers.filter(c => c.active) : []; }
+    function activeStandards() { return state.data ? state.data.master.standards.filter(s => s.active) : []; }
+    function sortedPallets() { return state.data ? [...state.data.pallets].sort((a, b) => a.palletNo.localeCompare(b.palletNo)) : []; }
+    function findPallet(palletNo) { return state.data && state.data.pallets.find(p => p.palletNo === String(palletNo || '').trim()); }
+    function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
+    function selectedCooler(selectId) { const id = $(selectId).value; return activeCoolers().find(c => c.coolerId === id) || activeCoolers()[0] || null; }
+    function placementByLocation() {
+      const map = {};
+      (state.data ? state.data.placements : []).forEach(p => map[p.locationId] = p);
+      return map;
+    }
+    function locationMatrix(cooler, level) {
+      const existing = {};
+      state.data.master.locations
+        .filter(loc => loc.coolerId === cooler.coolerId && Number(loc.level) === Number(level))
+        .forEach(loc => existing[`${loc.row}-${loc.col}`] = loc);
+      const list = [];
+      for (let row = 1; row <= Number(cooler.rowCount); row++) {
+        for (let col = 1; col <= Number(cooler.colCount); col++) {
+          list.push(existing[`${row}-${col}`] || {
+            locationId: makeLocationId(cooler.coolerId, level, row, col),
+            coolerId: cooler.coolerId,
+            level,
+            row,
+            col,
+            displayName: `R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}`,
+            available: true
+          });
+        }
+      }
+      return list;
+    }
+    function makeLocationId(coolerId, level, row, col) {
+      return `${coolerId}-${level}-R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}`;
+    }
   </script>
 </body>
 </html>
