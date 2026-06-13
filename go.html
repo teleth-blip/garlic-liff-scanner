@@ -9,91 +9,53 @@
       margin: 0;
       padding: 24px;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #1f2933;
-      background: #f5f7f5;
+      color: #17211b;
+      background: #f3f6f4;
     }
     .panel {
       max-width: 520px;
       margin: 40px auto;
       padding: 20px;
-      border: 1px solid #d8dee4;
+      border: 1px solid #d8e0da;
       border-radius: 8px;
       background: #fff;
     }
     h1 { margin: 0 0 12px; font-size: 22px; }
     p { line-height: 1.6; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
     a {
       display: inline-block;
       min-height: 44px;
       padding: 12px 16px;
       border-radius: 8px;
-      background: #27765d;
+      background: #176b55;
       color: #fff;
       font-weight: 800;
       text-decoration: none;
     }
-    a.secondary { background: #edf0f2; color: #1f2933; border: 1px solid #d8dee4; }
   </style>
 </head>
 <body>
   <main class="panel">
     <h1>にんにく冷蔵庫を開いています</h1>
-    <p id="message">下のボタンを押して開いてください。</p>
-    <div class="actions">
-      <a id="chromeLink" href="#">Chromeで開く</a>
-      <a id="edgeLink" class="secondary" href="#">Edgeで開く</a>
-      <a id="normalLink" class="secondary" href="#">通常で開く</a>
-    </div>
+    <p id="message">少し待っても切り替わらない場合は、下のボタンを押してください。</p>
+    <a id="openLink" href="./">開く</a>
   </main>
   <script>
-    const APP_URL = 'https://script.google.com/macros/s/AKfycbwV9IecaDNZL6sfojQxGZjZ4wlS19nzJkWJi4ZkiaCnNlLx8yoD1UzgQbAcMgPErwt3DA/exec';
     const params = new URLSearchParams(location.search);
-    const palletNo = params.get('pallet') || params.get('palletNo') || params.get('p') || params.get('qr') || '';
-    const mode = params.get('mode') || params.get('action') || '';
-    const target = new URL(APP_URL);
-    if (palletNo) target.searchParams.set('pallet', palletNo);
-    if (mode) target.searchParams.set('mode', mode);
+    const target = new URL('./', location.href);
+    ['pallet', 'palletNo', 'p', 'qr', 'mode', 'action'].forEach(key => {
+      const value = params.get(key);
+      if (value) target.searchParams.set(key, value);
+    });
     const href = target.toString();
-    const chromeLink = document.getElementById('chromeLink');
-    const edgeLink = document.getElementById('edgeLink');
-    const normalLink = document.getElementById('normalLink');
-    const isAndroid = /Android/i.test(navigator.userAgent || '');
-    const chromeIntent = buildAndroidIntent(href, 'com.android.chrome');
-    const edgeIntent = buildAndroidIntent(href, 'com.microsoft.emmx');
-    chromeLink.href = isAndroid ? chromeIntent : href;
-    edgeLink.href = isAndroid ? edgeIntent : href;
-    normalLink.href = href;
-    chromeLink.addEventListener('click', event => openIntent(event, chromeIntent, href));
-    edgeLink.addEventListener('click', event => openIntent(event, edgeIntent, href));
+    document.getElementById('openLink').href = href;
+    const palletNo = target.searchParams.get('pallet') || target.searchParams.get('palletNo') || target.searchParams.get('p') || '';
     document.getElementById('message').textContent = palletNo
-      ? `パレット ${palletNo} の画面を開きます。AndroidではChromeで開くを押してください。`
-      : 'にんにく冷蔵庫管理を開きます。AndroidではChromeで開くを押してください。';
-    if (!isAndroid) {
-      setTimeout(() => {
-        location.href = href;
-      }, 100);
-    }
-
-    function openIntent(event, intentUrl, fallbackUrl) {
-      if (!isAndroid) return;
-      event.preventDefault();
-      location.href = intentUrl || fallbackUrl;
-    }
-
-    function buildAndroidIntent(urlText, packageName) {
-      const url = new URL(urlText);
-      const path = `${url.host}${url.pathname}${url.search}`;
-      return [
-        `intent://${path}#Intent`,
-        `scheme=${url.protocol.replace(':', '')}`,
-        'action=android.intent.action.VIEW',
-        'category=android.intent.category.BROWSABLE',
-        `package=${packageName}`,
-        `S.browser_fallback_url=${encodeURIComponent(location.href)}`,
-        'end'
-      ].join(';');
-    }
+      ? `パレット ${palletNo} の画面を開きます。`
+      : 'にんにく冷蔵庫管理を開きます。';
+    setTimeout(() => {
+      location.replace(href);
+    }, 100);
   </script>
 </body>
 </html>
