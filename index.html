@@ -27,6 +27,8 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      width: 100%;
+      overflow-x: hidden;
       color: var(--ink);
       background: var(--bg);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -36,7 +38,7 @@
       position: sticky;
       top: 0;
       z-index: 20;
-      padding: 12px;
+      padding: 8px;
       background: #fff;
       border-bottom: 1px solid var(--line);
     }
@@ -44,7 +46,7 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
-      max-width: 1180px;
+      max-width: none;
       margin: 0 auto;
     }
     h1 {
@@ -59,9 +61,10 @@
       align-items: end;
     }
     main {
-      width: min(1180px, 100%);
+      width: 100%;
+      max-width: none;
       margin: 0 auto;
-      padding: 12px;
+      padding: 8px;
     }
     .tabs {
       display: flex;
@@ -87,7 +90,7 @@
     }
     .panel {
       margin-bottom: 12px;
-      padding: 14px;
+      padding: 12px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel);
@@ -146,6 +149,13 @@
       color: var(--ink);
       background: #fff;
       border-color: var(--line);
+    }
+    button.scan-button {
+      min-width: 82px;
+      background: #0b6fba;
+      border-color: #0b6fba;
+      color: #fff;
+      box-shadow: 0 2px 0 rgba(0, 0, 0, .15);
     }
     button.danger {
       background: var(--danger);
@@ -247,8 +257,9 @@
       overflow-wrap: anywhere;
     }
     .cell.available { background: #fff; }
-    .cell.used { background: var(--used); border-color: #91cbb8; }
+    .cell.used { background: #d7f0df; border-color: #58aa72; color: #12381f; }
     .cell.unavailable { background: var(--disabled); color: #6b7280; border-color: #c7ccd1; }
+    .cell.stack-blocked { background: #fff1d6; color: #7a3f00; border-color: #e6ad45; }
     .cell.selected { background: var(--selected); border-color: #af7f00; }
     .cell .sub {
       display: block;
@@ -320,25 +331,11 @@
       box-shadow: 0 10px 28px rgba(0,0,0,.2);
     }
     #toast.error { background: var(--danger); }
-    .qr-choice-list {
+    .qr-pick-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .qr-choice {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      padding: 8px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      font-weight: 800;
-    }
-    .qr-choice input {
-      width: 22px;
-      min-height: 22px;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      gap: 10px;
+      align-items: end;
     }
     .label-sheet {
       display: grid;
@@ -378,6 +375,19 @@
       font-weight: 900;
       overflow-wrap: anywhere;
     }
+    .qr-title-line {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 3mm;
+      align-items: baseline;
+      margin-bottom: 2mm;
+    }
+    .qr-title-line .pallet-no { margin-bottom: 0; }
+    .qr-date {
+      white-space: nowrap;
+      font-size: 10px;
+      font-weight: 800;
+    }
     .detail-mini {
       width: 100%;
       min-width: 0;
@@ -397,10 +407,22 @@
         align-items: center;
       }
     }
+    @media (max-width: 720px) {
+      main { padding: 6px; }
+      .panel {
+        margin-left: -6px;
+        margin-right: -6px;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+      }
+      .qr-pick-grid { grid-template-columns: 1fr; }
+      .field-with-button { grid-template-columns: 1fr 96px; }
+    }
     @media print {
       @page { size: A4 landscape; margin: 0; }
       body { background: #fff; }
-      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .action-row, #toast, #scannerPanel {
+      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast, #scannerPanel {
         display: none !important;
       }
       main { width: 297mm; padding: 0; }
@@ -500,20 +522,17 @@
         <h2>QR印刷</h2>
         <span class="muted">A-one 72206 / A4横 / 2列3行</span>
       </div>
-      <div class="form-grid">
-        <label>状態で絞り込み
-          <select id="qrStatusFilter">
-            <option value="">すべて</option>
-            <option>未配置</option>
-            <option>保管中</option>
-            <option>仮移動中</option>
-            <option>出庫済</option>
-          </select>
+      <div class="qr-pick-grid">
+        <label>左列パレット番号
+          <input id="qrLeftNo" list="qrPalletOptions" autocomplete="off">
+        </label>
+        <label>右列パレット番号
+          <input id="qrRightNo" list="qrPalletOptions" autocomplete="off">
         </label>
       </div>
-      <div id="qrChoices" class="qr-choice-list"></div>
+      <datalist id="qrPalletOptions"></datalist>
       <div class="action-row">
-        <button type="button" id="clearQrBtn" class="secondary">選択解除</button>
+        <button type="button" id="clearQrBtn" class="secondary">入力クリア</button>
         <button type="button" id="printBtn">印刷</button>
       </div>
       <div id="printArea" class="label-sheet"></div>
@@ -529,19 +548,19 @@
           <select id="inLevel"></select>
         </label>
       </div>
-      <div id="inGrid" class="location-grid"></div>
       <div class="form-grid">
         <div class="field-with-button">
           <label>パレット番号
             <input id="inPalletNo" autocomplete="off">
           </label>
-          <button type="button" class="secondary" data-scan-target="inPalletNo">読取</button>
+          <button type="button" class="scan-button" data-scan-target="inPalletNo">読取</button>
         </div>
         <label>備考
           <input id="inMemo">
         </label>
       </div>
       <div id="inPalletSummary" class="pallet-summary hidden"></div>
+      <div id="inGrid" class="location-grid"></div>
       <div class="action-row">
         <button type="button" id="inboundBtn">入庫登録</button>
       </div>
@@ -716,11 +735,12 @@
     const LIFF_ID = '2010379383-rwQBpt0b';
     const state = {
       data: null,
+      workers: [],
       workerId: localStorage.getItem('garlic.workerId') || '',
       tab: 'register',
       editPalletNo: '',
       selectedLocations: { inbound: '', move: '' },
-      qrSelected: new Set(),
+      qrPrint: { left: '', right: '' },
       masterDraftKey: '',
       masterUnavailable: new Set(),
       scanner: null,
@@ -769,8 +789,15 @@
       $('clearRegisterBtn').addEventListener('click', clearRegisterForm);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
       $('savePalletBtn').addEventListener('click', savePallet);
-      $('qrStatusFilter').addEventListener('change', renderQrChoices);
-      $('clearQrBtn').addEventListener('click', () => { state.qrSelected.clear(); renderQrChoices(); renderPrintArea(); });
+      $('qrLeftNo').addEventListener('input', () => { state.qrPrint.left = $('qrLeftNo').value.trim(); renderPrintArea(); });
+      $('qrRightNo').addEventListener('input', () => { state.qrPrint.right = $('qrRightNo').value.trim(); renderPrintArea(); });
+      $('clearQrBtn').addEventListener('click', () => {
+        state.qrPrint.left = '';
+        state.qrPrint.right = '';
+        $('qrLeftNo').value = '';
+        $('qrRightNo').value = '';
+        renderPrintArea();
+      });
       $('printBtn').addEventListener('click', () => window.print());
       $('inCooler').addEventListener('change', () => { renderLevelOptions('inLevel', selectedCooler('inCooler')); state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inLevel').addEventListener('change', () => { state.selectedLocations.inbound = ''; renderInboundGrid(); });
@@ -801,9 +828,12 @@
 
     async function refreshAll() {
       try {
+        showToast('作業者を読み込んでいます。');
+        await refreshWorkersOnly().catch(error => console.warn(error));
         showToast('データを読み込んでいます。');
         const data = await api('getAppData');
         state.data = data;
+        state.workers = data.master.workers || state.workers;
         ensureWorkerSelection();
         renderAll();
         showToast('読み込みました。');
@@ -814,6 +844,7 @@
 
     function renderAll() {
       if (!state.data) return;
+      state.workers = state.data.master.workers || state.workers;
       renderWorkers();
       renderSelectors();
       if (!state.editPalletNo && !$('detailRows').children.length) addDetailRow();
@@ -894,6 +925,13 @@
     function renderWorkers() {
       $('workerSelect').innerHTML = activeWorkers().map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}（${esc(w.workerId)}）</option>`).join('');
       $('workerSelect').value = state.workerId;
+    }
+
+    async function refreshWorkersOnly() {
+      const res = await api('getWorkers');
+      state.workers = res && res.master && Array.isArray(res.master.workers) ? res.master.workers : [];
+      ensureWorkerSelection();
+      renderWorkers();
     }
 
     function renderSelectors() {
@@ -1025,33 +1063,19 @@
     }
 
     function renderQrChoices() {
-      const filter = $('qrStatusFilter').value;
-      const pallets = sortedPallets().filter(p => !filter || p.status === filter);
-      $('qrChoices').innerHTML = pallets.map(p => `
-        <label class="qr-choice">
-          <input type="checkbox" value="${esc(p.palletNo)}" ${state.qrSelected.has(p.palletNo) ? 'checked' : ''}>
-          <span>${esc(p.palletNo)} / ${esc(p.status)} / ${num(p.weight)}kg</span>
-        </label>
-      `).join('');
-      $('qrChoices').querySelectorAll('input').forEach(input => input.addEventListener('change', () => {
-        if (input.checked) {
-          if (state.qrSelected.size >= 6) {
-            input.checked = false;
-            showToast('1枚に印刷できるのは6パレットまでです。', true);
-            return;
-          }
-          state.qrSelected.add(input.value);
-        } else {
-          state.qrSelected.delete(input.value);
-        }
-        renderPrintArea();
-      }));
+      $('qrPalletOptions').innerHTML = sortedPallets()
+        .map(p => `<option value="${esc(p.palletNo)}">${esc(p.status)} / ${num(p.weight)}kg</option>`)
+        .join('');
     }
 
     function renderPrintArea() {
-      const selected = Array.from(state.qrSelected).slice(0, 6).map(findPallet).filter(Boolean);
+      const left = findPallet(state.qrPrint.left || $('qrLeftNo').value);
+      const right = findPallet(state.qrPrint.right || $('qrRightNo').value);
       const labels = [];
-      for (let i = 0; i < 6; i++) labels.push(selected[i] ? qrLabelHtml(selected[i]) : '<div class="qr-label blank"></div>');
+      for (let row = 0; row < 3; row++) {
+        labels.push(left ? qrLabelHtml(left) : '<div class="qr-label blank"></div>');
+        labels.push(right ? qrLabelHtml(right) : '<div class="qr-label blank"></div>');
+      }
       $('printArea').innerHTML = labels.join('');
     }
 
@@ -1059,9 +1083,12 @@
       const details = detailsFor(pallet.palletNo);
       return `
         <div class="qr-label">
-          <div class="qr-code">${qrSvg(launchUrl(pallet.palletNo))}</div>
+          <div class="qr-code">${qrSvg(pallet.palletNo)}</div>
           <div class="qr-meta">
-            <div class="pallet-no">${esc(pallet.palletNo)}</div>
+            <div class="qr-title-line">
+              <div class="pallet-no">${esc(pallet.palletNo)}</div>
+              <div class="qr-date">${esc(formatReiwaDate(new Date()))}</div>
+            </div>
             <div>重量 ${num(pallet.weight)}kg</div>
             ${details.length ? detailMiniTable(details) : '<div>明細なし</div>'}
           </div>
@@ -1083,10 +1110,10 @@
       return qr.createSvgTag(5, 1);
     }
 
-    function launchUrl(palletNo) {
-      const url = new URL(APP_HOME_URL);
-      url.searchParams.set('pallet', palletNo);
-      return url.toString();
+    function formatReiwaDate(date) {
+      const year = date.getFullYear();
+      const reiwa = year - 2018;
+      return `令和${reiwa}年${date.getMonth() + 1}月${date.getDate()}日`;
     }
 
     function renderInboundGrid() {
@@ -1109,14 +1136,31 @@
       container.innerHTML = locations.map(loc => {
         const placed = placement[loc.locationId];
         const selected = state.selectedLocations[kind] === loc.locationId;
-        const cls = !loc.available ? 'unavailable' : placed ? 'used' : selected ? 'selected' : 'available';
-        const label = placed ? placed.palletNo : loc.available ? (loc.displayName || `${loc.row}-${loc.col}`) : '使用不可';
-        return `<button type="button" class="cell ${cls}" data-location="${esc(loc.locationId)}" ${(!loc.available || placed) ? 'disabled' : ''}>${esc(label)}<span class="sub">${esc(loc.locationId)}</span></button>`;
+        const support = stackSupport(loc, placement);
+        const canSelect = !!loc.available && !placed && support.ok;
+        const cls = !loc.available ? 'unavailable' : placed ? 'used' : !support.ok ? 'stack-blocked' : selected ? 'selected' : 'available';
+        const label = !loc.available ? '使用不可' : placed ? placed.palletNo : '空き';
+        const sub = placed ? '使用済み' : !loc.available ? (loc.note || '') : support.message;
+        return `<button type="button" class="cell ${cls}" data-location="${esc(loc.locationId)}" ${canSelect ? '' : 'disabled'}>${esc(label)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</button>`;
       }).join('');
       container.querySelectorAll('[data-location]').forEach(btn => btn.addEventListener('click', () => {
         state.selectedLocations[kind] = btn.dataset.location;
         kind === 'inbound' ? renderInboundGrid() : renderMoveGrid();
       }));
+    }
+
+    function stackSupport(loc, placement) {
+      const level = Number(loc.level || 1);
+      if (level <= 1) return { ok: true, message: '' };
+      const lowerId = makeLocationId(loc.coolerId, level - 1, loc.row, loc.col);
+      const lowerLocation = state.data.master.locations.find(item => item.locationId === lowerId);
+      if (!lowerLocation || !lowerLocation.available) {
+        return { ok: false, message: `${level - 1}段目が使用不可` };
+      }
+      if (!placement[lowerId]) {
+        return { ok: false, message: `${level - 1}段目にパレットが必要` };
+      }
+      return { ok: true, message: `${level - 1}段目あり` };
     }
 
     function renderCheckGrid() {
@@ -1411,7 +1455,7 @@
     }
 
     async function api(method, payload = {}) {
-      if (method === 'getAppData' || method === 'ping') {
+      if (method === 'getAppData' || method === 'getWorkers' || method === 'ping') {
         return firstSuccessfulApi([
           () => apiViaJsonp(method, payload),
           () => apiViaBridge(method, payload)
@@ -1420,7 +1464,7 @@
       try {
         return await apiViaBridge(method, payload);
       } catch (error) {
-        if (error.requestSent && method !== 'getAppData' && method !== 'ping') throw error;
+        if (error.requestSent && method !== 'getAppData' && method !== 'getWorkers' && method !== 'ping') throw error;
         return apiViaJsonp(method, payload);
       }
     }
@@ -1712,7 +1756,10 @@
       showToast.timer = setTimeout(() => toast.classList.add('hidden'), isError ? 5200 : 2400);
     }
 
-    function activeWorkers() { return state.data ? state.data.master.workers.filter(w => w.active) : []; }
+    function activeWorkers() {
+      const workers = state.workers.length ? state.workers : (state.data ? state.data.master.workers : []);
+      return workers.filter(w => w.active);
+    }
     function activeCoolers() { return state.data ? state.data.master.coolers.filter(c => c.active) : []; }
     function activeStandards() { return state.data ? state.data.master.standards.filter(s => s.active) : []; }
     function sortedPallets() { return state.data ? [...state.data.pallets].sort((a, b) => a.palletNo.localeCompare(b.palletNo)) : []; }
