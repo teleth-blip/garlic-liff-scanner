@@ -517,8 +517,16 @@
         <label>パレット番号
           <input id="regPalletNo" placeholder="空欄なら自動採番">
         </label>
-        <label>重量
-          <input id="regWeight" inputmode="decimal">
+        <label>重量（明細合計）
+          <input id="regWeight" inputmode="decimal" readonly>
+        </label>
+        <label>状態
+          <select id="regStatus" disabled>
+            <option value="未配置">未配置</option>
+            <option value="保管中">保管中</option>
+            <option value="仮移動中">仮移動中</option>
+            <option value="出庫済">出庫済</option>
+          </select>
         </label>
         <label>備考
           <input id="regMemo">
@@ -527,7 +535,7 @@
       <h3>明細</h3>
       <div class="table-wrap">
         <table id="detailTable">
-          <thead><tr><th>生産者番号</th><th>規格</th><th>価格</th><th>備考</th><th></th></tr></thead>
+          <thead><tr><th>生産者番号</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th><th></th></tr></thead>
           <tbody id="detailRows"></tbody>
         </table>
       </div>
@@ -1037,12 +1045,18 @@
       tr.innerHTML = `
         <td><input data-detail="producerNo" value="${esc(data.producerNo || '')}"></td>
         <td><select data-detail="standard">${standardOptions(data.standard || '')}</select></td>
+        <td><input data-detail="weight" inputmode="decimal" value="${esc(data.weight || '')}"></td>
         <td><input data-detail="price" inputmode="decimal" value="${esc(data.price || '')}"></td>
         <td><input data-detail="memo" value="${esc(data.memo || '')}"></td>
         <td><button type="button" class="secondary small">削除</button></td>
       `;
-      tr.querySelector('button').addEventListener('click', () => tr.remove());
+      tr.querySelector('[data-detail="weight"]').addEventListener('input', updateRegisterWeight);
+      tr.querySelector('button').addEventListener('click', () => {
+        tr.remove();
+        updateRegisterWeight();
+      });
       $('detailRows').appendChild(tr);
+      updateRegisterWeight();
     }
 
     function standardOptions(selected) {
@@ -1055,6 +1069,8 @@
       $('savePalletBtn').textContent = '登録';
       $('regPalletNo').disabled = false;
       $('regPalletNo').value = '';
+      $('regStatus').value = '未配置';
+      $('regStatus').disabled = true;
       $('regWeight').value = '';
       $('regMemo').value = '';
       setDefaultYear();
@@ -1071,6 +1087,8 @@
       $('regYear').value = pallet.productionYear || String(new Date().getFullYear());
       $('regPalletNo').value = pallet.palletNo;
       $('regPalletNo').disabled = true;
+      $('regStatus').value = pallet.status || '未配置';
+      $('regStatus').disabled = false;
       $('regWeight').value = pallet.weight || '';
       $('regMemo').value = pallet.memo || '';
       $('detailRows').innerHTML = '';
@@ -1085,6 +1103,7 @@
           productionYear: $('regYear').value,
           palletNo: $('regPalletNo').value,
           weight: $('regWeight').value,
+          status: state.editPalletNo ? $('regStatus').value : '未配置',
           memo: $('regMemo').value,
           details: collectDetails()
         };
@@ -1099,12 +1118,29 @@
     }
 
     function collectDetails() {
+      updateRegisterWeight();
       return Array.from($('detailRows').querySelectorAll('tr')).map(tr => ({
         producerNo: tr.querySelector('[data-detail="producerNo"]').value,
         standard: tr.querySelector('[data-detail="standard"]').value,
+        weight: tr.querySelector('[data-detail="weight"]').value,
         price: tr.querySelector('[data-detail="price"]').value,
         memo: tr.querySelector('[data-detail="memo"]').value
-      })).filter(r => r.producerNo || r.standard || r.price || r.memo);
+      })).filter(r => r.producerNo || r.standard || r.weight || r.price || r.memo);
+    }
+
+    function updateRegisterWeight() {
+      const total = Array.from($('detailRows').querySelectorAll('[data-detail="weight"]'))
+        .reduce((sum, input) => sum + parseInputNumber(input.value), 0);
+      $('regWeight').value = total ? formatInputNumber(total) : '';
+    }
+
+    function parseInputNumber(value) {
+      const n = Number(String(value || '').replace(/,/g, '').trim());
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function formatInputNumber(value) {
+      return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
     }
 
     async function deletePallet(palletNo) {
@@ -1152,8 +1188,8 @@
     }
 
     function detailMiniTable(details) {
-      return `<table class="detail-mini"><thead><tr><th>生産者</th><th>規格</th><th>価格</th></tr></thead><tbody>${
-        details.map(d => `<tr><td>${esc(d.producerNo)}</td><td>${esc(d.standard)}</td><td>${num(d.price)}</td></tr>`).join('')
+      return `<table class="detail-mini"><thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th></tr></thead><tbody>${
+        details.map(d => `<tr><td>${esc(d.producerNo)}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td></tr>`).join('')
       }</tbody></table>`;
     }
 
