@@ -1392,12 +1392,32 @@
     }
 
     async function api(method, payload = {}) {
+      if (method === 'getAppData' || method === 'ping') {
+        return firstSuccessfulApi([
+          () => apiViaJsonp(method, payload),
+          () => apiViaBridge(method, payload)
+        ]);
+      }
       try {
         return await apiViaBridge(method, payload);
       } catch (error) {
         if (error.requestSent && method !== 'getAppData' && method !== 'ping') throw error;
         return apiViaJsonp(method, payload);
       }
+    }
+
+    function firstSuccessfulApi(tasks) {
+      return new Promise((resolve, reject) => {
+        let failures = 0;
+        let lastError = null;
+        tasks.forEach(run => {
+          run().then(resolve).catch(error => {
+            failures += 1;
+            lastError = error;
+            if (failures === tasks.length) reject(lastError || new Error('Apps Script APIを読み込めませんでした。'));
+          });
+        });
+      });
     }
 
     function apiViaBridge(method, payload = {}) {
