@@ -278,6 +278,24 @@
       border-radius: 8px;
       background: #fafcfb;
     }
+    .summary-detail {
+      width: 100%;
+      min-width: 0;
+      border-collapse: collapse;
+    }
+    .summary-detail th, .summary-detail td {
+      padding: 5px 6px;
+      border: 1px solid var(--line);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .summary-detail th { background: #eef4f0; }
+    tr.selectable-row {
+      cursor: pointer;
+    }
+    tr.selectable-row.selected {
+      background: #fff8dc;
+    }
     .moving-list {
       display: grid;
       gap: 8px;
@@ -698,6 +716,7 @@
         </label>
       </div>
       <div id="checkGrid" class="location-grid"></div>
+      <div id="checkPalletSummary" class="pallet-summary hidden"></div>
       <h3>状態別一覧</h3>
       <div class="table-wrap">
         <table>
@@ -794,6 +813,8 @@
       tab: 'register',
       editPalletNo: '',
       selectedLocations: { inbound: '', outbound: '', moveStart: '', move: '' },
+      inventorySelectedPalletNo: '',
+      busy: false,
       qrPrint: { left: '', right: '' },
       masterDraftKey: '',
       masterUnavailable: new Set(),
@@ -842,7 +863,7 @@
       });
       $('clearRegisterBtn').addEventListener('click', clearRegisterForm);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
-      $('savePalletBtn').addEventListener('click', savePallet);
+      $('savePalletBtn').addEventListener('click', () => withBusy('savePalletBtn', '保存中...', savePallet));
       $('qrLeftNo').addEventListener('input', () => { state.qrPrint.left = $('qrLeftNo').value.trim(); renderPrintArea(); });
       $('qrRightNo').addEventListener('input', () => { state.qrPrint.right = $('qrRightNo').value.trim(); renderPrintArea(); });
       $('clearQrBtn').addEventListener('click', () => {
@@ -856,32 +877,54 @@
       $('inCooler').addEventListener('change', () => { renderLevelOptions('inLevel', selectedCooler('inCooler')); state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inLevel').addEventListener('change', () => { state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inPalletNo').addEventListener('input', () => renderActionPallet('in'));
-      $('inboundBtn').addEventListener('click', recordInbound);
+      $('inboundBtn').addEventListener('click', () => withBusy('inboundBtn', '入庫中...', recordInbound));
       $('outCooler').addEventListener('change', () => { renderLevelOptions('outLevel', selectedCooler('outCooler')); state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outLevel').addEventListener('change', () => { state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outPalletNo').addEventListener('input', () => { state.selectedLocations.outbound = ''; renderActionPallet('out'); renderOutboundGrid(); });
-      $('outboundBtn').addEventListener('click', recordOutbound);
+      $('outboundBtn').addEventListener('click', () => withBusy('outboundBtn', '出庫中...', recordOutbound));
       $('moveStartCooler').addEventListener('change', () => { renderLevelOptions('moveStartLevel', selectedCooler('moveStartCooler')); state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartLevel').addEventListener('change', () => { state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartPalletNo').addEventListener('input', () => { state.selectedLocations.moveStart = ''; renderActionPallet('moveStart'); renderMoveStartGrid(); });
-      $('moveStartBtn').addEventListener('click', startMove);
+      $('moveStartBtn').addEventListener('click', () => withBusy('moveStartBtn', '仮移動中...', startMove));
       $('moveCooler').addEventListener('change', () => { renderLevelOptions('moveLevel', selectedCooler('moveCooler')); state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveLevel').addEventListener('change', () => { state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveDonePalletNo').addEventListener('input', () => { renderActionPallet('moveDone'); renderMovingList(); });
-      $('moveDoneBtn').addEventListener('click', completeMove);
+      $('moveDoneBtn').addEventListener('click', () => withBusy('moveDoneBtn', '確定中...', completeMove));
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', renderInventoryRows);
       $('addStandardBtn').addEventListener('click', addStandardRow);
-      $('saveStandardsBtn').addEventListener('click', saveStandards);
+      $('saveStandardsBtn').addEventListener('click', () => withBusy('saveStandardsBtn', '保存中...', saveStandards));
       $('addCoolerBtn').addEventListener('click', addCoolerRow);
-      $('saveCoolersBtn').addEventListener('click', saveCoolers);
+      $('saveCoolersBtn').addEventListener('click', () => withBusy('saveCoolersBtn', '保存中...', saveCoolers));
       $('masterCooler').addEventListener('change', () => { renderLevelOptions('masterLevel', selectedCooler('masterCooler')); loadMasterDraft(); renderMasterGrid(); });
       $('masterLevel').addEventListener('change', () => { loadMasterDraft(); renderMasterGrid(); });
-      $('saveLocationsBtn').addEventListener('click', saveLocations);
+      $('saveLocationsBtn').addEventListener('click', () => withBusy('saveLocationsBtn', '保存中...', saveLocations));
       $('addWorkerBtn').addEventListener('click', addWorkerRow);
-      $('saveWorkersBtn').addEventListener('click', saveWorkers);
+      $('saveWorkersBtn').addEventListener('click', () => withBusy('saveWorkersBtn', '保存中...', saveWorkers));
       $('stopScanBtn').addEventListener('click', stopScanner);
+    }
+
+    async function withBusy(buttonId, busyText, task) {
+      if (state.busy) return;
+      const btn = $(buttonId);
+      const originalText = btn ? btn.textContent : '';
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const disabledStates = buttons.map(button => [button, button.disabled]);
+      state.busy = true;
+      buttons.forEach(button => button.disabled = true);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = busyText;
+      }
+      showToast(busyText);
+      try {
+        await task();
+      } finally {
+        disabledStates.forEach(([button, wasDisabled]) => button.disabled = wasDisabled);
+        if (btn && btn.textContent === busyText) btn.textContent = originalText;
+        state.busy = false;
+      }
     }
 
     async function refreshAll() {
@@ -916,6 +959,7 @@
       renderMovingList();
       renderCheckGrid();
       renderInventoryRows();
+      renderInventoryPallet();
       renderMaster();
       renderActionPallet('in');
       renderActionPallet('out');
@@ -1340,10 +1384,17 @@
       container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
       container.innerHTML = locations.map(loc => {
         const placed = placement[loc.locationId];
-        const cls = !loc.available ? 'unavailable' : placed ? 'used' : 'available';
+        const selected = placed && placed.palletNo === state.inventorySelectedPalletNo;
+        const cls = !loc.available ? 'unavailable' : placed ? (selected ? 'selected' : 'used') : 'available';
         const label = placed ? placed.palletNo : loc.available ? '空き' : '使用不可';
-        return `<div class="cell ${cls}">${esc(label)}<span class="sub">${esc(loc.displayName || loc.locationId)}</span></div>`;
+        return `<button type="button" class="cell ${cls}" data-check-pallet="${esc(placed ? placed.palletNo : '')}" ${placed ? '' : 'disabled'}>${esc(label)}<span class="sub">${esc(loc.displayName || loc.locationId)}</span></button>`;
       }).join('');
+      container.querySelectorAll('[data-check-pallet]').forEach(btn => btn.addEventListener('click', () => {
+        state.inventorySelectedPalletNo = btn.dataset.checkPallet || '';
+        renderCheckGrid();
+        renderInventoryRows();
+        renderInventoryPallet();
+      }));
     }
 
     function renderActionPallet(kind) {
@@ -1362,11 +1413,23 @@
         return;
       }
       el.classList.remove('hidden');
-      el.innerHTML = `
+      el.innerHTML = palletSummaryHtml(pallet);
+    }
+
+    function palletSummaryHtml(pallet) {
+      const details = detailsFor(pallet.palletNo);
+      return `
         <div><strong>${esc(pallet.palletNo)}</strong> / ${esc(pallet.status)} / ${num(pallet.weight)}kg</div>
         <div>場所: ${esc(pallet.currentLocationName || pallet.currentLocationId || '未配置')}</div>
         <div>備考: ${esc(pallet.memo || '')}</div>
+        ${details.length ? detailSummaryTable(details) : '<div class="muted">明細なし</div>'}
       `;
+    }
+
+    function detailSummaryTable(details) {
+      return `<table class="summary-detail"><thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th></tr></thead><tbody>${
+        details.map(d => `<tr><td>${esc(d.producerNo)}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td><td>${esc(d.memo || '')}</td></tr>`).join('')
+      }</tbody></table>`;
     }
 
     async function recordInbound() {
@@ -1438,9 +1501,29 @@
 
     function renderInventoryRows() {
       const q = $('searchPallet').value.trim();
-      $('inventoryRows').innerHTML = sortedPallets().filter(p => !q || p.palletNo.includes(q)).map(p => `
-        <tr><td>${esc(p.palletNo)}</td><td>${esc(p.status)}</td><td>${num(p.weight)}</td><td>${esc(p.currentLocationName || '')}</td><td>${esc(p.registeredAt || '')}</td></tr>
+      const rows = sortedPallets().filter(p => !q || p.palletNo.includes(q));
+      if (state.inventorySelectedPalletNo && !rows.some(p => p.palletNo === state.inventorySelectedPalletNo)) state.inventorySelectedPalletNo = '';
+      $('inventoryRows').innerHTML = rows.map(p => `
+        <tr class="selectable-row ${p.palletNo === state.inventorySelectedPalletNo ? 'selected' : ''}" data-inventory-pallet="${esc(p.palletNo)}"><td>${esc(p.palletNo)}</td><td>${esc(p.status)}</td><td>${num(p.weight)}</td><td>${esc(p.currentLocationName || '')}</td><td>${esc(p.registeredAt || '')}</td></tr>
       `).join('');
+      document.querySelectorAll('[data-inventory-pallet]').forEach(row => row.addEventListener('click', () => {
+        state.inventorySelectedPalletNo = row.dataset.inventoryPallet;
+        renderCheckGrid();
+        renderInventoryRows();
+        renderInventoryPallet();
+      }));
+    }
+
+    function renderInventoryPallet() {
+      const el = $('checkPalletSummary');
+      const pallet = findPallet(state.inventorySelectedPalletNo);
+      if (!pallet) {
+        el.classList.add('hidden');
+        el.innerHTML = '';
+        return;
+      }
+      el.classList.remove('hidden');
+      el.innerHTML = palletSummaryHtml(pallet);
     }
 
     function renderMaster() {
@@ -1592,6 +1675,10 @@
     }
 
     function renderHistoryRows() {
+      if (!state.data.histories || !state.data.histories.length) {
+        $('historyRows').innerHTML = '<tr><td colspan="6" class="muted">操作履歴は画面表示を高速化するため読み込んでいません。</td></tr>';
+        return;
+      }
       $('historyRows').innerHTML = (state.data.histories || []).map(h => `
         <tr><td>${esc(h.at)}</td><td>${esc(h.workerName || h.workerId)}</td><td>${esc(h.action)}</td><td>${esc(h.palletNo)}</td><td>${esc(h.content)}</td><td>${esc(h.memo)}</td></tr>
       `).join('');
