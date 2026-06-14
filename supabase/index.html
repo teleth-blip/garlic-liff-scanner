@@ -173,6 +173,10 @@
           <strong>接続状態</strong>
           <span class="pill warn" id="connectionState">未確認</span>
         </div>
+        <div class="status-row">
+          <strong>RPC状態</strong>
+          <span class="pill warn" id="rpcState">未確認</span>
+        </div>
       </div>
     </section>
 
@@ -218,6 +222,7 @@
     const tableRows = document.getElementById('tableRows');
     const workerRows = document.getElementById('workerRows');
     const stateEl = document.getElementById('connectionState');
+    const rpcStateEl = document.getElementById('rpcState');
     document.getElementById('projectUrl').textContent = SUPABASE_URL;
     document.getElementById('checkBtn').addEventListener('click', checkConnection);
     renderTablePlaceholders();
@@ -235,6 +240,7 @@
         }
         renderTableRows(results);
         await renderWorkers();
+        await checkRpc();
         const hasError = results.some(r => r.error);
         setState(hasError ? 'warn' : 'ok', hasError ? '一部未準備' : '接続OK');
       } catch (error) {
@@ -273,6 +279,15 @@
       `).join('') || '<tr><td colspan="3">作業者がありません。</td></tr>';
     }
 
+    async function checkRpc() {
+      const { data, error } = await client.rpc('ping_write_api');
+      if (error) {
+        setRpcState('warn', '未準備');
+        return;
+      }
+      setRpcState(data && data.ok ? 'ok' : 'warn', data && data.message ? data.message : 'RPC確認済み');
+    }
+
     function renderTablePlaceholders() {
       tableRows.innerHTML = TABLES.map(table => `
         <tr><td>${escapeHtml(table)}</td><td>-</td><td><span class="pill warn">未確認</span></td></tr>
@@ -296,6 +311,11 @@
     function setState(type, text) {
       stateEl.className = `pill ${type}`;
       stateEl.textContent = text;
+    }
+
+    function setRpcState(type, text) {
+      rpcStateEl.className = `pill ${type}`;
+      rpcStateEl.textContent = text;
     }
 
     function escapeHtml(value) {
