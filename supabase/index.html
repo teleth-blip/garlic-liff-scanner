@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>にんにく冷蔵庫管理 Supabase版</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7f5;
+      --panel: #ffffff;
+      --line: #d7ded9;
+      --text: #18231f;
+      --muted: #65736d;
+      --brand: #246b54;
+      --brand-strong: #174b3a;
+      --danger: #a33a2b;
+      --ok: #24744e;
+      --warn: #9a6a12;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .96);
+    }
+    h1 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: 0;
+    }
+    main {
+      width: 100%;
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+    section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 12px;
+    }
+    h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+    p { margin: 0 0 8px; color: var(--muted); }
+    button, a.button {
+      appearance: none;
+      min-height: 44px;
+      border: 1px solid var(--brand);
+      border-radius: 8px;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+      padding: 10px 14px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    button:disabled {
+      opacity: .65;
+    }
+    a.button.secondary {
+      background: #fff;
+      color: var(--brand-strong);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .status {
+      display: grid;
+      gap: 8px;
+    }
+    .status-row {
+      display: grid;
+      grid-template-columns: minmax(100px, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 40px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .status-row strong { font-size: 14px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 74px;
+      min-height: 30px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-weight: 800;
+      font-size: 13px;
+      color: #fff;
+      background: var(--muted);
+    }
+    .pill.ok { background: var(--ok); }
+    .pill.warn { background: var(--warn); }
+    .pill.error { background: var(--danger); }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+      color: #26342f;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .notice {
+      border-left: 4px solid var(--brand);
+      padding: 8px 10px;
+      background: #eef6f2;
+      color: #24352f;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>にんにく冷蔵庫管理 Supabase版</h1>
+  </header>
+  <main>
+    <section>
+      <h2>接続確認</h2>
+      <p class="notice">このページはDB版の準備確認用です。現在のスプレッドシート版には影響しません。</p>
+      <div class="actions">
+        <button type="button" id="checkBtn">接続を確認</button>
+        <a class="button secondary" href="../">現在の画面へ戻る</a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Supabase</h2>
+      <div class="status">
+        <div class="status-row">
+          <strong>Project URL</strong>
+          <span class="mono" id="projectUrl"></span>
+        </div>
+        <div class="status-row">
+          <strong>接続状態</strong>
+          <span class="pill warn" id="connectionState">未確認</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>テーブル確認</h2>
+      <table>
+        <thead>
+          <tr><th>テーブル</th><th>件数</th><th>状態</th></tr>
+        </thead>
+        <tbody id="tableRows"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>作業者</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>名前</th><th>権限</th></tr>
+        </thead>
+        <tbody id="workerRows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://yedrlbrzrkbtgswzplia.supabase.co';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_TiUI0G7_5emKLNINYjRJmA_NluL-UYb';
+    const TABLES = [
+      'workers',
+      'standards',
+      'coolers',
+      'locations',
+      'producers',
+      'pallets',
+      'pallet_details',
+      'placements',
+      'moving_pallets',
+      'operation_histories'
+    ];
+
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+    const tableRows = document.getElementById('tableRows');
+    const workerRows = document.getElementById('workerRows');
+    const stateEl = document.getElementById('connectionState');
+    document.getElementById('projectUrl').textContent = SUPABASE_URL;
+    document.getElementById('checkBtn').addEventListener('click', checkConnection);
+    renderTablePlaceholders();
+    checkConnection();
+
+    async function checkConnection() {
+      const btn = document.getElementById('checkBtn');
+      btn.disabled = true;
+      btn.textContent = '確認中...';
+      setState('warn', '確認中');
+      try {
+        const results = [];
+        for (const table of TABLES) {
+          results.push(await countTable(table));
+        }
+        renderTableRows(results);
+        await renderWorkers();
+        const hasError = results.some(r => r.error);
+        setState(hasError ? 'warn' : 'ok', hasError ? '一部未準備' : '接続OK');
+      } catch (error) {
+        setState('error', '接続失敗');
+        tableRows.innerHTML = `<tr><td colspan="3">${escapeHtml(error.message || String(error))}</td></tr>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '接続を確認';
+      }
+    }
+
+    async function countTable(table) {
+      const { count, error } = await client
+        .from(table)
+        .select('*', { count: 'exact', head: true });
+      if (error) return { table, count: '-', error: error.message };
+      return { table, count, error: '' };
+    }
+
+    async function renderWorkers() {
+      const { data, error } = await client
+        .from('workers')
+        .select('worker_id, worker_name, role')
+        .eq('active', true)
+        .order('display_order', { ascending: true });
+      if (error) {
+        workerRows.innerHTML = `<tr><td colspan="3">${escapeHtml(error.message)}</td></tr>`;
+        return;
+      }
+      workerRows.innerHTML = (data || []).map(worker => `
+        <tr>
+          <td>${escapeHtml(worker.worker_id)}</td>
+          <td>${escapeHtml(worker.worker_name)}</td>
+          <td>${escapeHtml(worker.role)}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="3">作業者がありません。</td></tr>';
+    }
+
+    function renderTablePlaceholders() {
+      tableRows.innerHTML = TABLES.map(table => `
+        <tr><td>${escapeHtml(table)}</td><td>-</td><td><span class="pill warn">未確認</span></td></tr>
+      `).join('');
+      workerRows.innerHTML = '<tr><td colspan="3">未確認</td></tr>';
+    }
+
+    function renderTableRows(results) {
+      tableRows.innerHTML = results.map(result => `
+        <tr>
+          <td>${escapeHtml(result.table)}</td>
+          <td>${escapeHtml(String(result.count))}</td>
+          <td>${result.error
+            ? `<span class="pill error">エラー</span><div class="mono">${escapeHtml(result.error)}</div>`
+            : '<span class="pill ok">OK</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function setState(type, text) {
+      stateEl.className = `pill ${type}`;
+      stateEl.textContent = text;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+  </script>
+</body>
+</html>
