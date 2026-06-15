@@ -1573,20 +1573,25 @@
 
     function renderRegisterTable() {
       $('registeredPalletRows').innerHTML = sortedPallets().map(p => `
-        <tr>
+        <tr class="selectable-row ${p.palletNo === state.editPalletNo ? 'selected' : ''}" data-edit-pallet="${esc(p.palletNo)}">
           <td>${esc(p.palletNo)}</td>
           <td>${esc(p.status)}</td>
           <td>${num(p.weight)}</td>
           <td>${esc(p.currentLocationName || '')}</td>
           <td>${esc(p.memo || '')}</td>
           <td>
-            <button type="button" class="secondary small" data-edit-pallet="${esc(p.palletNo)}">編集</button>
             <button type="button" class="danger small" data-delete-pallet="${esc(p.palletNo)}">削除</button>
           </td>
         </tr>
       `).join('');
-      document.querySelectorAll('[data-edit-pallet]').forEach(btn => btn.addEventListener('click', () => editPallet(btn.dataset.editPallet)));
-      document.querySelectorAll('[data-delete-pallet]').forEach(btn => btn.addEventListener('click', () => deletePallet(btn.dataset.deletePallet)));
+      document.querySelectorAll('#registeredPalletRows [data-edit-pallet]').forEach(row => row.addEventListener('click', event => {
+        if (event.target.closest('[data-delete-pallet]')) return;
+        editPallet(row.dataset.editPallet);
+      }));
+      document.querySelectorAll('#registeredPalletRows [data-delete-pallet]').forEach(btn => btn.addEventListener('click', event => {
+        event.stopPropagation();
+        deletePallet(btn.dataset.deletePallet);
+      }));
     }
 
     function addDetailRow(data = {}) {
@@ -1743,6 +1748,7 @@
       $('detailRows').innerHTML = '';
       detailsFor(palletNo).forEach(addDetailRow);
       if (!$('detailRows').children.length) addDetailRow();
+      renderRegisterTable();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
