@@ -293,6 +293,11 @@
       color: #7a3f00;
     }
     .muted { color: var(--muted); }
+    .panel-note {
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
     .table-wrap {
       overflow: auto;
       max-height: min(62vh, 520px);
@@ -329,6 +334,46 @@
       gap: 10px;
       margin-bottom: 10px;
       align-items: end;
+    }
+    .operation-row {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) 76px minmax(122px, 158px);
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 10px;
+      min-width: 0;
+    }
+    .operation-row select,
+    .operation-row input {
+      min-width: 0;
+    }
+    .pallet-lock-field {
+      display: grid;
+      gap: 5px;
+    }
+    .pallet-lock-field input:read-only {
+      border-color: #af7f00;
+      background: #fff8dc;
+      font-weight: 800;
+    }
+    .unlock-pallet-btn {
+      min-height: 32px;
+      padding: 5px 7px;
+      font-size: 12px;
+    }
+    @media (max-width: 420px) {
+      .operation-row {
+        grid-template-columns: minmax(138px, 1fr) 66px minmax(106px, 128px);
+        gap: 6px;
+      }
+      .operation-row label {
+        font-size: 12px;
+      }
+      .operation-row select,
+      .operation-row input {
+        min-height: 40px;
+        padding: 7px 8px;
+      }
     }
     .location-grid {
       display: grid;
@@ -378,6 +423,10 @@
     .cell.unavailable { background: var(--disabled); color: #6b7280; border-color: #c7ccd1; }
     .cell.stack-blocked { background: #fff1d6; color: #7a3f00; border-color: #e6ad45; }
     .cell.selected { background: var(--selected); border-color: #af7f00; }
+    .cell.locked-target {
+      border-color: #af7f00;
+      box-shadow: 0 0 0 3px rgba(255, 214, 102, .75);
+    }
     .cell .sub {
       display: block;
       margin-top: 3px;
@@ -696,7 +745,7 @@
         <select id="loginWorkerSelect"></select>
       </label>
       <label>PIN
-        <input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="未設定の場合は空欄">
+        <input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="必須">
       </label>
       <div class="login-actions">
         <button type="submit" id="loginBtn">ログイン</button>
@@ -743,8 +792,8 @@
     </nav>
 
     <section id="registerPanel" class="panel" data-panel="register">
-      <div class="section-title">
-        <h2 id="registerTitle">パレット登録</h2>
+      <div class="action-row">
+        <span id="registerTitle" class="hidden">パレット登録</span>
         <button type="button" id="clearRegisterBtn" class="secondary small">入力クリア</button>
       </div>
       <div class="form-grid">
@@ -791,10 +840,7 @@
     </section>
 
     <section id="qrPanel" class="panel hidden" data-panel="qr">
-      <div class="section-title">
-        <h2>QR印刷</h2>
-        <span class="muted">標準カメラ用QR / A-one 72206 / A4横 / 2列3行</span>
-      </div>
+      <div class="panel-note muted">標準カメラ用QR / A-one 72206 / A4横 / 2列3行</div>
       <div class="qr-pick-grid">
         <label class="pallet-pick-field">左列パレット番号
           <input id="qrLeftNo" autocomplete="off">
@@ -813,21 +859,21 @@
     </section>
 
     <section id="inboundPanel" class="panel hidden" data-panel="inbound">
-      <div class="section-title"><h2>入庫</h2></div>
-      <div class="grid-controls">
+      <div class="operation-row">
         <label>冷蔵庫
           <select id="inCooler"></select>
         </label>
         <label>段
           <select id="inLevel"></select>
         </label>
-      </div>
-      <div class="form-grid">
-        <div class="field-with-button">
+        <div class="pallet-lock-field">
           <label>パレット番号
             <input id="inPalletNo" autocomplete="off">
           </label>
+          <button type="button" id="unlockInPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
         </div>
+      </div>
+      <div class="form-grid">
         <label>備考
           <input id="inMemo">
         </label>
@@ -840,21 +886,21 @@
     </section>
 
     <section id="outboundPanel" class="panel hidden" data-panel="outbound">
-      <div class="section-title"><h2>出庫</h2></div>
-      <div class="grid-controls">
+      <div class="operation-row">
         <label>冷蔵庫
           <select id="outCooler"></select>
         </label>
         <label>段
           <select id="outLevel"></select>
         </label>
-      </div>
-      <div class="form-grid">
-        <div class="field-with-button">
+        <div class="pallet-lock-field">
           <label>パレット番号
             <input id="outPalletNo" autocomplete="off">
           </label>
+          <button type="button" id="unlockOutPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
         </div>
+      </div>
+      <div class="form-grid">
         <label>備考
           <input id="outMemo">
         </label>
@@ -867,22 +913,22 @@
     </section>
 
     <section id="movePanel" class="panel hidden" data-panel="move">
-      <div class="section-title"><h2>移動</h2></div>
       <h3>仮移動</h3>
-      <div class="grid-controls">
+      <div class="operation-row">
         <label>冷蔵庫
           <select id="moveStartCooler"></select>
         </label>
         <label>段
           <select id="moveStartLevel"></select>
         </label>
-      </div>
-      <div class="form-grid">
-        <div class="field-with-button">
-          <label>動かすパレット番号
+        <div class="pallet-lock-field">
+          <label>パレット番号
             <input id="moveStartPalletNo" autocomplete="off">
           </label>
+          <button type="button" id="unlockMoveStartPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
         </div>
+      </div>
+      <div class="form-grid">
         <label>備考
           <input id="moveStartMemo">
         </label>
@@ -893,22 +939,23 @@
         <button type="button" id="moveStartBtn">仮移動</button>
       </div>
       <h3>移動確定</h3>
-      <div class="grid-controls">
+      <div class="operation-row">
         <label>冷蔵庫
           <select id="moveCooler"></select>
         </label>
         <label>段
           <select id="moveLevel"></select>
         </label>
+        <div class="pallet-lock-field">
+          <label>パレット番号
+            <input id="moveDonePalletNo" autocomplete="off">
+          </label>
+          <button type="button" id="unlockMoveDonePalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
+        </div>
       </div>
       <div id="moveGrid" class="location-grid"></div>
       <div id="movingList" class="moving-list"></div>
       <div class="form-grid">
-        <div class="field-with-button">
-          <label>確定するパレット番号
-            <input id="moveDonePalletNo" autocomplete="off">
-          </label>
-        </div>
         <label>備考
           <input id="moveDoneMemo">
         </label>
@@ -920,7 +967,6 @@
     </section>
 
     <section id="inventoryPanel" class="panel hidden" data-panel="inventory">
-      <div class="section-title"><h2>配置確認</h2></div>
       <div class="grid-controls">
         <label>冷蔵庫
           <select id="checkCooler"></select>
@@ -944,7 +990,6 @@
     </section>
 
     <section id="masterPanel" class="panel hidden" data-panel="master">
-      <div class="section-title"><h2>マスタ管理</h2></div>
       <details class="master-section">
         <summary>規格マスタ</summary>
         <div class="master-body">
@@ -1024,6 +1069,7 @@
       tab: 'register',
       editPalletNo: '',
       selectedLocations: { inbound: '', outbound: '', moveStart: '', move: '' },
+      lockedPallets: { inbound: '', outbound: '', moveStart: '', moveDone: '' },
       inventorySelectedPalletNo: '',
       busy: false,
       qrPrint: { left: '', right: '' },
@@ -1107,18 +1153,22 @@
       $('inCooler').addEventListener('change', () => { renderLevelOptions('inLevel', selectedCooler('inCooler')); state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inLevel').addEventListener('change', () => { state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inPalletNo').addEventListener('input', () => renderActionPallet('in'));
+      $('unlockInPalletBtn').addEventListener('click', () => unlockActionPallet('inbound'));
       $('inboundBtn').addEventListener('click', () => withBusy('inboundBtn', '入庫中...', recordInbound));
       $('outCooler').addEventListener('change', () => { renderLevelOptions('outLevel', selectedCooler('outCooler')); state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outLevel').addEventListener('change', () => { state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outPalletNo').addEventListener('input', () => { state.selectedLocations.outbound = ''; renderActionPallet('out'); renderOutboundGrid(); });
+      $('unlockOutPalletBtn').addEventListener('click', () => unlockActionPallet('outbound'));
       $('outboundBtn').addEventListener('click', () => withBusy('outboundBtn', '出庫中...', recordOutbound));
       $('moveStartCooler').addEventListener('change', () => { renderLevelOptions('moveStartLevel', selectedCooler('moveStartCooler')); state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartLevel').addEventListener('change', () => { state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartPalletNo').addEventListener('input', () => { state.selectedLocations.moveStart = ''; renderActionPallet('moveStart'); renderMoveStartGrid(); });
+      $('unlockMoveStartPalletBtn').addEventListener('click', () => unlockActionPallet('moveStart'));
       $('moveStartBtn').addEventListener('click', () => withBusy('moveStartBtn', '仮移動中...', startMove));
       $('moveCooler').addEventListener('change', () => { renderLevelOptions('moveLevel', selectedCooler('moveCooler')); state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveLevel').addEventListener('change', () => { state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveDonePalletNo').addEventListener('input', () => { renderActionPallet('moveDone'); renderMovingList(); });
+      $('unlockMoveDonePalletBtn').addEventListener('click', () => unlockActionPallet('moveDone'));
       $('moveDoneBtn').addEventListener('click', () => withBusy('moveDoneBtn', '確定中...', completeMove));
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
@@ -1195,6 +1245,7 @@
       renderActionPallet('out');
       renderActionPallet('moveStart');
       renderActionPallet('moveDone');
+      renderPalletLocks();
     }
 
     function setTab(tab) {
@@ -1228,21 +1279,88 @@
       const palletNo = state.launch.palletNo;
       if (!palletNo) return;
       if (action === 'inbound') {
-        $('inPalletNo').value = palletNo;
+        lockActionPallet('inbound', palletNo);
         setTab('inbound');
         renderActionPallet('in');
+        renderInboundGrid();
       } else if (action === 'outbound') {
-        $('outPalletNo').value = palletNo;
+        lockActionPallet('outbound', palletNo);
+        focusStoredPalletLocation(palletNo, 'outCooler', 'outLevel', 'outbound');
         setTab('outbound');
         renderActionPallet('out');
+        renderOutboundGrid();
       } else {
         const pallet = findPallet(palletNo);
-        if (pallet && pallet.status === '仮移動中') $('moveDonePalletNo').value = palletNo;
-        else $('moveStartPalletNo').value = palletNo;
+        if (pallet && pallet.status === '仮移動中') {
+          lockActionPallet('moveDone', palletNo);
+        } else {
+          lockActionPallet('moveStart', palletNo);
+          focusStoredPalletLocation(palletNo, 'moveStartCooler', 'moveStartLevel', 'moveStart');
+        }
         setTab('move');
         renderActionPallet('moveStart');
         renderActionPallet('moveDone');
+        renderMoveStartGrid();
+        renderMovingList();
       }
+    }
+
+    function lockActionPallet(kind, palletNo) {
+      const inputId = actionInputId(kind);
+      if (!inputId) return;
+      const value = cleanText(palletNo);
+      state.lockedPallets[kind] = value;
+      $(inputId).value = value;
+      renderPalletLocks();
+    }
+
+    function unlockActionPallet(kind) {
+      state.lockedPallets[kind] = '';
+      renderPalletLocks();
+      if (kind === 'outbound') renderOutboundGrid();
+      if (kind === 'moveStart') renderMoveStartGrid();
+      if (kind === 'moveDone') renderMovingList();
+      showToast('パレット固定を解除しました。');
+    }
+
+    function renderPalletLocks() {
+      [
+        ['inbound', 'inPalletNo', 'unlockInPalletBtn'],
+        ['outbound', 'outPalletNo', 'unlockOutPalletBtn'],
+        ['moveStart', 'moveStartPalletNo', 'unlockMoveStartPalletBtn'],
+        ['moveDone', 'moveDonePalletNo', 'unlockMoveDonePalletBtn']
+      ].forEach(([kind, inputId, buttonId]) => {
+        const locked = !!state.lockedPallets[kind];
+        $(inputId).readOnly = locked;
+        $(buttonId).classList.toggle('hidden', !locked);
+      });
+    }
+
+    function actionInputId(kind) {
+      return {
+        inbound: 'inPalletNo',
+        outbound: 'outPalletNo',
+        moveStart: 'moveStartPalletNo',
+        moveDone: 'moveDonePalletNo'
+      }[kind] || '';
+    }
+
+    function focusStoredPalletLocation(palletNo, coolerSelectId, levelSelectId, selectionKind) {
+      const pallet = findPallet(palletNo);
+      if (!pallet || !pallet.currentLocationId) {
+        showToast('現在の保管場所がないため配置図を自動表示できません。', true);
+        return false;
+      }
+      const location = findLocation(pallet.currentLocationId) || parseLocationId(pallet.currentLocationId);
+      if (!location || !location.coolerId) {
+        showToast('保管場所IDを読み取れませんでした。', true);
+        return false;
+      }
+      $(coolerSelectId).value = location.coolerId;
+      renderLevelOptions(levelSelectId, selectedCooler(coolerSelectId));
+      $(levelSelectId).value = String(location.level || 1);
+      state.selectedLocations[selectionKind] = pallet.currentLocationId;
+      return true;
     }
 
     function setDefaultYear() {
@@ -1276,6 +1394,14 @@
       }
       const configuredPin = workerPin(worker);
       const inputPin = cleanText($('loginPin').value);
+      if (!configuredPin) {
+        $('loginMessage').textContent = 'この作業者にはPINが設定されていません。作業者マスタの備考に PIN:数字 を設定してください。';
+        return;
+      }
+      if (!inputPin) {
+        $('loginMessage').textContent = 'PINを入力してください。';
+        return;
+      }
       if (configuredPin && inputPin !== configuredPin) {
         $('loginMessage').textContent = 'PINが違います。';
         return;
@@ -1288,6 +1414,7 @@
 
     function logout() {
       localStorage.removeItem('garlic.login.v1');
+      localStorage.removeItem('garlic.login.v2');
       localStorage.removeItem('garlic.workerId');
       state.workerId = '';
       state.data = null;
@@ -1296,7 +1423,7 @@
 
     function restoreLogin() {
       try {
-        const saved = JSON.parse(localStorage.getItem('garlic.login.v1') || '{}');
+        const saved = JSON.parse(localStorage.getItem('garlic.login.v2') || '{}');
         if (!saved || !saved.workerId) return false;
         const worker = activeWorkers().find(w => w.workerId === saved.workerId);
         if (!worker) return false;
@@ -1312,7 +1439,7 @@
       const worker = activeWorkers().find(w => w.workerId === workerId);
       if (!worker) return;
       localStorage.setItem('garlic.workerId', worker.workerId);
-      localStorage.setItem('garlic.login.v1', JSON.stringify({
+      localStorage.setItem('garlic.login.v2', JSON.stringify({
         workerId: worker.workerId,
         workerName: worker.workerName,
         loggedInAt: new Date().toISOString()
@@ -1783,12 +1910,18 @@
       const locations = locationMatrix(cooler, level);
       const inputId = kind === 'outbound' ? 'outPalletNo' : 'moveStartPalletNo';
       const currentPalletNo = $(inputId).value.trim();
+      const lockedPalletNo = state.lockedPallets[kind] || '';
       const cells = locations.map(loc => {
         const placed = placement[loc.locationId];
+        const lockedTarget = !!lockedPalletNo && placed && placed.palletNo === lockedPalletNo;
         const selected = state.selectedLocations[kind] === loc.locationId || (placed && placed.palletNo === currentPalletNo);
         const upper = upperClear(loc, placement, cooler);
-        const canSelect = !!loc.available && !!placed && upper.ok;
-        const cls = !loc.available ? 'unavailable' : !placed ? 'available' : !upper.ok ? 'stack-blocked' : selected ? 'selected' : 'removable';
+        const matchesLock = !lockedPalletNo || lockedTarget;
+        const canSelect = !!loc.available && !!placed && upper.ok && matchesLock;
+        const cls = [
+          !loc.available ? 'unavailable' : !placed ? 'available' : !upper.ok ? 'stack-blocked' : selected ? 'selected' : 'removable',
+          lockedTarget ? 'locked-target' : ''
+        ].filter(Boolean).join(' ');
         const label = !loc.available ? '使用不可' : placed ? placed.palletNo : '空き';
         const sub = !loc.available ? (loc.note || '') : placed ? (upper.message || '出庫可能') : '';
         return `<button type="button" class="cell ${cls}" data-remove-location="${esc(loc.locationId)}" data-remove-pallet="${esc(placed ? placed.palletNo : '')}" ${canSelect ? '' : 'disabled'}>${esc(label)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</button>`;
@@ -1835,12 +1968,15 @@
         return;
       }
       const current = $('moveDonePalletNo').value.trim();
+      const lockedPalletNo = state.lockedPallets.moveDone || '';
       container.innerHTML = moving.map(item => {
         const selected = item.palletNo === current;
+        const lockedTarget = !!lockedPalletNo && item.palletNo === lockedPalletNo;
+        const disabled = !!lockedPalletNo && !lockedTarget;
         const pallet = findPallet(item.palletNo);
         const from = item.fromLocationName || item.fromLocationId || '';
         const weight = pallet ? `${num(pallet.weight)}kg` : '';
-        return `<button type="button" class="moving-item ${selected ? 'selected' : ''}" data-moving-pallet="${esc(item.palletNo)}">
+        return `<button type="button" class="moving-item ${selected || lockedTarget ? 'selected' : ''}" data-moving-pallet="${esc(item.palletNo)}" ${disabled ? 'disabled' : ''}>
           <strong>${esc(item.palletNo)}</strong>
           <span class="sub">${esc([from, weight].filter(Boolean).join(' / '))}</span>
         </button>`;
@@ -1924,6 +2060,8 @@
         $('inPalletNo').value = '';
         $('inMemo').value = '';
         state.selectedLocations.inbound = '';
+        state.lockedPallets.inbound = '';
+        renderPalletLocks();
       } catch (error) {
         showToast(error.message, true);
       }
@@ -1936,6 +2074,8 @@
         $('outPalletNo').value = '';
         $('outMemo').value = '';
         state.selectedLocations.outbound = '';
+        state.lockedPallets.outbound = '';
+        renderPalletLocks();
         renderActionPallet('out');
         renderOutboundGrid();
       } catch (error) {
@@ -1946,12 +2086,16 @@
     async function startMove() {
       try {
         const palletNo = $('moveStartPalletNo').value;
+        const keepLockedForMoveDone = state.lockedPallets.moveStart === cleanText(palletNo);
         const res = await api('startMove', { palletNo, memo: $('moveStartMemo').value });
         applyDataResponse(res);
         $('moveDonePalletNo').value = palletNo;
         $('moveStartPalletNo').value = '';
         $('moveStartMemo').value = '';
         state.selectedLocations.moveStart = '';
+        state.lockedPallets.moveStart = '';
+        if (keepLockedForMoveDone) state.lockedPallets.moveDone = cleanText(palletNo);
+        renderPalletLocks();
         renderActionPallet('moveStart');
         renderMoveStartGrid();
         renderActionPallet('moveDone');
@@ -1972,6 +2116,8 @@
         $('moveDonePalletNo').value = '';
         $('moveDoneMemo').value = '';
         state.selectedLocations.move = '';
+        state.lockedPallets.moveDone = '';
+        renderPalletLocks();
         renderActionPallet('moveDone');
         renderMoveGrid();
         renderMovingList();
@@ -2652,6 +2798,20 @@
     function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
     function cleanText(value) { return String(value || '').trim(); }
     function selectedCooler(selectId) { const id = $(selectId).value; return activeCoolers().find(c => c.coolerId === id) || activeCoolers()[0] || null; }
+    function findLocation(locationId) {
+      return state.data && state.data.master.locations.find(loc => loc.locationId === locationId);
+    }
+    function parseLocationId(locationId) {
+      const match = String(locationId || '').match(/^(.+)-(\d+)-R(\d+)-C(\d+)$/);
+      if (!match) return null;
+      return {
+        locationId,
+        coolerId: match[1],
+        level: Number(match[2]),
+        row: Number(match[3]),
+        col: Number(match[4])
+      };
+    }
     function placementByLocation() {
       const map = {};
       (state.data ? state.data.placements : []).forEach(p => map[p.locationId] = p);
