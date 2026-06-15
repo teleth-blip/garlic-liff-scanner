@@ -282,11 +282,55 @@
     .producer-cell {
       display: grid;
       gap: 4px;
-      min-width: 180px;
+      min-width: 220px;
     }
     .producer-cell input {
       min-height: 36px;
       padding: 6px 8px;
+    }
+    .producer-suggestions {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      min-width: 260px;
+      max-height: 240px;
+      overflow: auto;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .12);
+    }
+    .producer-suggestions.hidden {
+      display: none;
+    }
+    .producer-option {
+      width: 100%;
+      min-height: 44px;
+      padding: 8px 10px;
+      border: 1px solid #d7ded9;
+      border-radius: 8px;
+      background: #f8fbf9;
+      color: var(--ink);
+      text-align: left;
+      font-weight: 700;
+    }
+    .producer-option .producer-name {
+      display: block;
+      overflow-wrap: anywhere;
+      line-height: 1.25;
+    }
+    .producer-option .producer-no {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .producer-no-match {
+      padding: 10px;
+      color: var(--muted);
+      font-size: 13px;
     }
     .summary-detail {
       width: 100%;
@@ -868,6 +912,9 @@
       document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
       document.querySelectorAll('[data-launch-action]').forEach(btn => btn.addEventListener('click', () => applyLaunchAction(btn.dataset.launchAction)));
       document.querySelectorAll('[data-scan-target]').forEach(btn => btn.addEventListener('click', () => startScanner(btn.dataset.scanTarget)));
+      document.addEventListener('click', event => {
+        if (!event.target.closest('.producer-cell')) closeProducerSuggestions();
+      });
       $('reloadBtn').addEventListener('click', refreshAll);
       $('workerSelect').addEventListener('change', () => {
         state.workerId = $('workerSelect').value;
@@ -1102,8 +1149,9 @@
       tr.innerHTML = `
         <td>
           <div class="producer-cell">
-            <input data-detail="producerSearch" list="producerOptions" placeholder="名前検索" value="${esc(producerDisplayValue(data.producerNo || ''))}">
+            <input data-detail="producerSearch" autocomplete="off" placeholder="名前検索" value="${esc(producerDisplayValue(data.producerNo || ''))}">
             <input data-detail="producerNo" placeholder="生産者番号" value="${esc(data.producerNo || '')}">
+            <div class="producer-suggestions hidden" data-producer-suggestions></div>
           </div>
         </td>
         <td><select data-detail="standard">${standardOptions(data.standard || '')}</select></td>
@@ -1112,10 +1160,15 @@
         <td><input data-detail="memo" value="${esc(data.memo || '')}"></td>
         <td><button type="button" class="secondary small">削除</button></td>
       `;
-      tr.querySelector('[data-detail="producerSearch"]').addEventListener('input', event => applyProducerSearch(tr, event.target.value));
+      const producerSearch = tr.querySelector('[data-detail="producerSearch"]');
+      producerSearch.addEventListener('focus', () => renderProducerSuggestions(tr, producerSearch.value));
+      producerSearch.addEventListener('input', event => {
+        applyProducerSearch(tr, event.target.value);
+        renderProducerSuggestions(tr, event.target.value);
+      });
       tr.querySelector('[data-detail="producerNo"]').addEventListener('input', event => {
         const producer = findProducer(event.target.value);
-        if (producer) tr.querySelector('[data-detail="producerSearch"]').value = producerDisplayValue(producer.producerNo);
+        if (producer) producerSearch.value = producerDisplayValue(producer.producerNo);
       });
       tr.querySelector('[data-detail="weight"]').addEventListener('input', updateRegisterWeight);
       tr.querySelector('button').addEventListener('click', () => {
@@ -1146,6 +1199,55 @@
     function applyProducerSearch(row, value) {
       const producer = findProducerByDisplay(value);
       if (producer) row.querySelector('[data-detail="producerNo"]').value = producer.producerNo;
+    }
+
+    function renderProducerSuggestions(row, value) {
+      closeProducerSuggestions(row);
+      const box = row.querySelector('[data-producer-suggestions]');
+      if (!box) return;
+      const query = cleanText(value).toLowerCase();
+      const producers = activeProducers()
+        .filter(p => {
+          if (!query) return true;
+          return `${p.producerNo} ${p.producerName}`.toLowerCase().includes(query);
+        })
+        .slice(0, 60);
+      if (!producers.length) {
+        box.innerHTML = '<div class="producer-no-match">該当なし</div>';
+      } else {
+        box.innerHTML = producers.map(p => `
+          <button type="button" class="producer-option" data-producer-pick="${esc(p.producerNo)}">
+            <span class="producer-name">${esc(p.producerName || '(名称なし)')}</span>
+            <span class="producer-no">${esc(p.producerNo)}</span>
+          </button>
+        `).join('');
+      }
+      box.classList.remove('hidden');
+      box.querySelectorAll('[data-producer-pick]').forEach(btn => {
+        btn.addEventListener('pointerdown', event => {
+          event.preventDefault();
+          selectProducer(row, btn.dataset.producerPick);
+        });
+        btn.addEventListener('click', event => {
+          event.preventDefault();
+          selectProducer(row, btn.dataset.producerPick);
+        });
+      });
+    }
+
+    function selectProducer(row, producerNo) {
+      const producer = findProducer(producerNo);
+      if (!producer) return;
+      row.querySelector('[data-detail="producerSearch"]').value = producerDisplayValue(producer.producerNo);
+      row.querySelector('[data-detail="producerNo"]').value = producer.producerNo;
+      closeProducerSuggestions();
+    }
+
+    function closeProducerSuggestions(exceptRow = null) {
+      document.querySelectorAll('[data-producer-suggestions]').forEach(box => {
+        if (exceptRow && exceptRow.contains(box)) return;
+        box.classList.add('hidden');
+      });
     }
 
     function findProducerByDisplay(value) {
