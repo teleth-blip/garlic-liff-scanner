@@ -448,6 +448,31 @@
       border-radius: 8px;
       background: #111;
     }
+    .camera-help-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 110;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, .66);
+    }
+    .camera-help-box {
+      width: min(520px, 100%);
+      padding: 16px;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .22);
+    }
+    .camera-help-box h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .camera-help-box p {
+      margin: 0 0 12px;
+      line-height: 1.6;
+    }
     #toast {
       position: fixed;
       left: 12px;
@@ -599,7 +624,7 @@
     @media print {
       @page { size: A4 landscape; margin: 0; }
       body { background: #fff; }
-      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast, #scannerPanel {
+      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast, #scannerPanel, #cameraHelpPanel {
         display: none !important;
       }
       main { width: 297mm; padding: 0; }
@@ -934,6 +959,17 @@
       </div>
     </div>
   </div>
+  <div id="cameraHelpPanel" class="camera-help-panel hidden">
+    <div class="camera-help-box">
+      <h3>カメラを許可できませんでした</h3>
+      <p>LINE内ブラウザでカメラが拒否されています。LINEのアプリ権限が許可済みでも、Webページ側のカメラが使えない場合があります。</p>
+      <p>外部ブラウザで開くと読取できる可能性があります。</p>
+      <div class="action-row">
+        <button type="button" id="openExternalBrowserBtn">外部ブラウザで開く</button>
+        <button type="button" id="closeCameraHelpBtn" class="secondary">このまま手入力</button>
+      </div>
+    </div>
+  </div>
   <div id="toast" class="hidden"></div>
 
   <script>
@@ -1049,6 +1085,8 @@
       $('addWorkerBtn').addEventListener('click', addWorkerRow);
       $('saveWorkersBtn').addEventListener('click', () => withBusy('saveWorkersBtn', '保存中...', saveWorkers));
       $('stopScanBtn').addEventListener('click', stopScanner);
+      $('openExternalBrowserBtn').addEventListener('click', openExternalBrowser);
+      $('closeCameraHelpBtn').addEventListener('click', hideCameraHelp);
     }
 
     async function withBusy(buttonId, busyText, task) {
@@ -2296,6 +2334,7 @@
         scanLoop();
       } catch (error) {
         focusManualInput(targetId);
+        if (isPermissionDeniedError(error)) showCameraHelp();
         showToast(cameraErrorMessage(error), true);
       }
     }
@@ -2326,7 +2365,7 @@
 
     function cameraErrorMessage(error) {
       if (isPermissionDeniedError(error)) {
-        return 'カメラ権限が拒否されています。LINEの場合は端末設定でLINEのカメラを許可し、画面を閉じて開き直してください。直らない場合はLINE右上メニューから外部ブラウザで開いてください。';
+        return 'カメラ権限が拒否されています。外部ブラウザで開くか、このまま手入力してください。';
       }
       const name = error && error.name ? String(error.name) : '';
       const message = error && error.message ? String(error.message) : '';
@@ -2340,6 +2379,28 @@
       if (!input) return;
       input.focus();
       input.select && input.select();
+    }
+
+    function showCameraHelp() {
+      $('cameraHelpPanel').classList.remove('hidden');
+    }
+
+    function hideCameraHelp() {
+      $('cameraHelpPanel').classList.add('hidden');
+    }
+
+    function openExternalBrowser() {
+      location.href = externalBrowserUrl();
+    }
+
+    function externalBrowserUrl() {
+      const href = location.href;
+      if (/Android/i.test(navigator.userAgent || '')) {
+        const url = new URL(href);
+        const path = `${url.host}${url.pathname}${url.search}${url.hash}`;
+        return `intent://${path}#Intent;scheme=${url.protocol.replace(':', '')};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(href)};end`;
+      }
+      return href;
     }
 
     async function scanLoop() {
