@@ -186,17 +186,21 @@
       border-color: var(--brand);
     }
     .sub-tabs {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 6px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+      padding: 4px;
+      border: 1px solid #cbd8d0;
+      border-radius: 10px;
+      background: #edf4ef;
     }
     .sub-tab {
-      flex: 1 1 0;
-      min-height: 42px;
+      min-height: 46px;
       padding: 8px 10px;
-      border: 1px solid var(--line);
+      border: 1px solid transparent;
       border-radius: 8px;
-      background: #fff;
+      background: transparent;
       color: var(--ink);
       font-weight: 800;
     }
@@ -285,6 +289,13 @@
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 10px;
       align-items: end;
+    }
+    .memo-row {
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) auto;
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 10px;
     }
     .action-row {
       display: flex;
@@ -377,9 +388,10 @@
       font-weight: 800;
     }
     .unlock-pallet-btn {
-      min-height: 32px;
-      padding: 5px 7px;
-      font-size: 12px;
+      min-height: 44px;
+      padding: 8px 10px;
+      font-size: 13px;
+      white-space: nowrap;
     }
     @media (max-width: 420px) {
       .operation-row {
@@ -890,13 +902,13 @@
           <label>パレット番号
             <input id="inPalletNo" autocomplete="off">
           </label>
-          <button type="button" id="unlockInPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
         </div>
       </div>
-      <div class="form-grid">
+      <div class="memo-row">
         <label>備考
           <input id="inMemo">
         </label>
+        <button type="button" class="secondary unlock-pallet-btn hidden" data-unlock-pallet>固定解除</button>
       </div>
       <div id="inPalletSummary" class="pallet-summary hidden"></div>
       <div id="inGrid" class="location-grid"></div>
@@ -917,13 +929,13 @@
           <label>パレット番号
             <input id="outPalletNo" autocomplete="off">
           </label>
-          <button type="button" id="unlockOutPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
         </div>
       </div>
-      <div class="form-grid">
+      <div class="memo-row">
         <label>備考
           <input id="outMemo">
         </label>
+        <button type="button" class="secondary unlock-pallet-btn hidden" data-unlock-pallet>固定解除</button>
       </div>
       <div id="outPalletSummary" class="pallet-summary hidden"></div>
       <div id="outGrid" class="location-grid"></div>
@@ -949,13 +961,13 @@
             <label>パレット番号
               <input id="moveStartPalletNo" autocomplete="off">
             </label>
-            <button type="button" id="unlockMoveStartPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
           </div>
         </div>
-        <div class="form-grid">
+        <div class="memo-row">
           <label>備考
             <input id="moveStartMemo">
           </label>
+          <button type="button" class="secondary unlock-pallet-btn hidden" data-unlock-pallet>固定解除</button>
         </div>
         <div id="moveStartSummary" class="pallet-summary hidden"></div>
         <div id="moveStartGrid" class="location-grid"></div>
@@ -975,15 +987,15 @@
             <label>パレット番号
               <input id="moveDonePalletNo" autocomplete="off">
             </label>
-            <button type="button" id="unlockMoveDonePalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
           </div>
         </div>
         <div id="moveGrid" class="location-grid"></div>
         <div id="movingList" class="moving-list"></div>
-        <div class="form-grid">
+        <div class="memo-row">
           <label>備考
             <input id="moveDoneMemo">
           </label>
+          <button type="button" class="secondary unlock-pallet-btn hidden" data-unlock-pallet>固定解除</button>
         </div>
         <div id="moveDoneSummary" class="pallet-summary hidden"></div>
         <div class="action-row">
@@ -1135,9 +1147,13 @@
     }
 
     function bindEvents() {
-      document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
+      document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => {
+        dismissLaunchPanel();
+        setTab(btn.dataset.tab);
+      }));
       document.querySelectorAll('[data-move-mode]').forEach(btn => btn.addEventListener('click', () => setMoveMode(btn.dataset.moveMode)));
       document.querySelectorAll('[data-launch-action]').forEach(btn => btn.addEventListener('click', () => applyLaunchAction(btn.dataset.launchAction)));
+      document.querySelectorAll('[data-unlock-pallet]').forEach(btn => btn.addEventListener('click', unlockActionPallets));
       document.addEventListener('click', event => {
         if (!event.target.closest('.producer-cell')) closeProducerSuggestions();
         if (!event.target.closest('.pallet-pick-field')) closePalletSuggestions();
@@ -1181,22 +1197,18 @@
       $('inCooler').addEventListener('change', () => { renderLevelOptions('inLevel', selectedCooler('inCooler')); state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inLevel').addEventListener('change', () => { state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inPalletNo').addEventListener('input', () => renderActionPallet('in'));
-      $('unlockInPalletBtn').addEventListener('click', () => unlockActionPallet('inbound'));
       $('inboundBtn').addEventListener('click', () => withBusy('inboundBtn', '入庫中...', recordInbound));
       $('outCooler').addEventListener('change', () => { renderLevelOptions('outLevel', selectedCooler('outCooler')); state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outLevel').addEventListener('change', () => { state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outPalletNo').addEventListener('input', () => { state.selectedLocations.outbound = ''; renderActionPallet('out'); renderOutboundGrid(); });
-      $('unlockOutPalletBtn').addEventListener('click', () => unlockActionPallet('outbound'));
       $('outboundBtn').addEventListener('click', () => withBusy('outboundBtn', '出庫中...', recordOutbound));
       $('moveStartCooler').addEventListener('change', () => { renderLevelOptions('moveStartLevel', selectedCooler('moveStartCooler')); state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartLevel').addEventListener('change', () => { state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartPalletNo').addEventListener('input', () => { state.selectedLocations.moveStart = ''; renderActionPallet('moveStart'); renderMoveStartGrid(); });
-      $('unlockMoveStartPalletBtn').addEventListener('click', () => unlockActionPallet('moveStart'));
       $('moveStartBtn').addEventListener('click', () => withBusy('moveStartBtn', '仮移動中...', startMove));
       $('moveCooler').addEventListener('change', () => { renderLevelOptions('moveLevel', selectedCooler('moveCooler')); state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveLevel').addEventListener('change', () => { state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveDonePalletNo').addEventListener('input', () => { renderActionPallet('moveDone'); renderMovingList(); });
-      $('unlockMoveDonePalletBtn').addEventListener('click', () => unlockActionPallet('moveDone'));
       $('moveDoneBtn').addEventListener('click', () => withBusy('moveDoneBtn', '確定中...', completeMove));
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
@@ -1317,6 +1329,7 @@
     function applyLaunchAction(action) {
       const palletNo = state.launch.palletNo;
       if (!palletNo) return;
+      dismissLaunchPanel();
       if (action === 'inbound') {
         lockActionPallet('inbound', palletNo);
         setTab('inbound');
@@ -1355,26 +1368,36 @@
       renderPalletLocks();
     }
 
-    function unlockActionPallet(kind) {
-      state.lockedPallets[kind] = '';
+    function unlockActionPallets() {
+      state.lockedPallets.inbound = '';
+      state.lockedPallets.outbound = '';
+      state.lockedPallets.moveStart = '';
+      state.lockedPallets.moveDone = '';
       renderPalletLocks();
-      if (kind === 'outbound') renderOutboundGrid();
-      if (kind === 'moveStart') renderMoveStartGrid();
-      if (kind === 'moveDone') renderMovingList();
+      renderInboundGrid();
+      renderOutboundGrid();
+      renderMoveStartGrid();
+      renderMoveGrid();
+      renderMovingList();
       showToast('パレット固定を解除しました。');
     }
 
     function renderPalletLocks() {
       [
-        ['inbound', 'inPalletNo', 'unlockInPalletBtn'],
-        ['outbound', 'outPalletNo', 'unlockOutPalletBtn'],
-        ['moveStart', 'moveStartPalletNo', 'unlockMoveStartPalletBtn'],
-        ['moveDone', 'moveDonePalletNo', 'unlockMoveDonePalletBtn']
-      ].forEach(([kind, inputId, buttonId]) => {
+        ['inbound', 'inPalletNo'],
+        ['outbound', 'outPalletNo'],
+        ['moveStart', 'moveStartPalletNo'],
+        ['moveDone', 'moveDonePalletNo']
+      ].forEach(([kind, inputId]) => {
         const locked = !!state.lockedPallets[kind];
         $(inputId).readOnly = locked;
-        $(buttonId).classList.toggle('hidden', !locked);
       });
+      const hasLockedPallet = Object.values(state.lockedPallets).some(Boolean);
+      document.querySelectorAll('[data-unlock-pallet]').forEach(btn => btn.classList.toggle('hidden', !hasLockedPallet));
+    }
+
+    function dismissLaunchPanel() {
+      $('launchPanel').classList.add('hidden');
     }
 
     function actionInputId(kind) {
