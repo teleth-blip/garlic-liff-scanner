@@ -996,12 +996,19 @@
         <div class="action-row">
           <button type="button" id="moveDoneBtn">移動確定</button>
         </div>
-        <div id="moveGrid" class="location-grid"></div>
         <div id="movingList" class="moving-list"></div>
+        <div id="moveGrid" class="location-grid"></div>
       </div>
     </section>
 
     <section id="inventoryPanel" class="panel hidden" data-panel="inventory">
+      <h3>状態別一覧</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>保管</th><th>登録日</th></tr></thead>
+          <tbody id="inventoryRows"></tbody>
+        </table>
+      </div>
       <div class="grid-controls">
         <label>パレット検索
           <input id="searchPallet" autocomplete="off">
@@ -1015,13 +1022,6 @@
       </div>
       <div id="checkGrid" class="location-grid"></div>
       <div id="checkPalletSummary" class="pallet-summary hidden"></div>
-      <h3>状態別一覧</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>保管</th><th>登録日</th></tr></thead>
-          <tbody id="inventoryRows"></tbody>
-        </table>
-      </div>
     </section>
 
     <section id="masterPanel" class="panel hidden" data-panel="master">
@@ -1978,6 +1978,12 @@
       container.innerHTML = html.join('');
     }
 
+    function setPlainGrid(container, cooler, cells) {
+      const colCount = Number(cooler.colCount || 0);
+      container.style.gridTemplateColumns = `repeat(${colCount}, minmax(78px, 1fr))`;
+      container.innerHTML = cells.join('');
+    }
+
     function renderSelectableGrid(containerId, cooler, level, kind) {
       const container = $(containerId);
       if (!cooler) {
@@ -2106,9 +2112,10 @@
         const selected = placed && placed.palletNo === state.inventorySelectedPalletNo;
         const cls = !loc.available ? 'unavailable' : placed ? (selected ? 'selected' : 'used') : 'available';
         const label = placed ? placed.palletNo : loc.available ? '空き' : '使用不可';
-        return `<button type="button" class="cell ${cls}" data-check-pallet="${esc(placed ? placed.palletNo : '')}" ${placed ? '' : 'disabled'}>${esc(label)}<span class="sub">${esc(loc.displayName || loc.locationId)}</span></button>`;
+        const producerNos = placed ? producerNosForPallet(placed.palletNo) : '';
+        return `<button type="button" class="cell ${cls}" data-check-pallet="${esc(placed ? placed.palletNo : '')}" ${placed ? '' : 'disabled'}>${esc(label)}${producerNos ? `<span class="sub">${esc(producerNos)}</span>` : ''}</button>`;
       });
-      setGridWithCoordinates(container, cooler, cells);
+      setPlainGrid(container, cooler, cells);
       container.querySelectorAll('[data-check-pallet]').forEach(btn => btn.addEventListener('click', () => {
         state.inventorySelectedPalletNo = btn.dataset.checkPallet || '';
         renderCheckGrid();
@@ -2238,7 +2245,7 @@
         <tr class="selectable-row ${p.palletNo === state.inventorySelectedPalletNo ? 'selected' : ''}" data-inventory-pallet="${esc(p.palletNo)}"><td>${esc(p.palletNo)}</td><td>${esc(p.status)}</td><td>${num(p.weight)}</td><td>${esc(currentStorageLabel(p))}</td><td>${esc(p.registeredAt || '')}</td></tr>
       `).join('');
       document.querySelectorAll('[data-inventory-pallet]').forEach(row => row.addEventListener('click', () => {
-        focusInventoryPallet(row.dataset.inventoryPallet, true);
+        focusInventoryPallet(row.dataset.inventoryPallet, false);
       }));
     }
 
@@ -3024,6 +3031,9 @@
     }
     function producerLabel(detail) { return [detail.producerNo, resolveProducerName(detail)].filter(Boolean).join(' '); }
     function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
+    function producerNosForPallet(palletNo) {
+      return [...new Set(detailsFor(palletNo).map(d => cleanText(d.producerNo)).filter(Boolean))].join(' / ');
+    }
     function cleanText(value) { return String(value || '').trim(); }
     function selectedCooler(selectId) { const id = $(selectId).value; return activeCoolers().find(c => c.coolerId === id) || activeCoolers()[0] || null; }
     function currentStorageLabel(pallet) {
