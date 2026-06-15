@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>にんにく冷蔵庫管理 DB版</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
@@ -150,13 +149,6 @@
       background: #fff;
       border-color: var(--line);
     }
-    button.scan-button {
-      min-width: 82px;
-      background: #0b6fba;
-      border-color: #0b6fba;
-      color: #fff;
-      box-shadow: 0 2px 0 rgba(0, 0, 0, .15);
-    }
     button.danger {
       background: var(--danger);
       border-color: var(--danger);
@@ -185,7 +177,7 @@
     }
     .field-with-button {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
       gap: 8px;
       align-items: end;
     }
@@ -427,52 +419,6 @@
       padding: 12px;
       border-top: 1px solid var(--line);
     }
-    .scanner-panel {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      display: grid;
-      place-items: center;
-      padding: 16px;
-      background: rgba(0, 0, 0, .72);
-    }
-    .scanner-box {
-      width: min(680px, 100%);
-      padding: 12px;
-      border-radius: 8px;
-      background: #fff;
-    }
-    #scannerVideo {
-      width: 100%;
-      max-height: 70vh;
-      border-radius: 8px;
-      background: #111;
-    }
-    .camera-help-panel {
-      position: fixed;
-      inset: 0;
-      z-index: 110;
-      display: grid;
-      place-items: center;
-      padding: 16px;
-      background: rgba(0, 0, 0, .66);
-    }
-    .camera-help-box {
-      width: min(520px, 100%);
-      padding: 16px;
-      border-radius: 8px;
-      background: #fff;
-      color: var(--ink);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, .22);
-    }
-    .camera-help-box h3 {
-      margin: 0 0 8px;
-      font-size: 18px;
-    }
-    .camera-help-box p {
-      margin: 0 0 12px;
-      line-height: 1.6;
-    }
     #toast {
       position: fixed;
       left: 12px;
@@ -619,12 +565,12 @@
         border-radius: 0;
       }
       .qr-pick-grid { grid-template-columns: 1fr; }
-      .field-with-button { grid-template-columns: 1fr 96px; }
+      .field-with-button { grid-template-columns: 1fr; }
     }
     @media print {
       @page { size: A4 landscape; margin: 0; }
       body { background: #fff; }
-      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast, #scannerPanel, #cameraHelpPanel {
+      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast {
         display: none !important;
       }
       main { width: 297mm; padding: 0; }
@@ -663,6 +609,7 @@
         <h2>QR読取パレット</h2>
         <span id="launchPalletNo" class="notice"></span>
       </div>
+      <p class="muted">スマホ標準カメラから開きました。処理を選んでください。</p>
       <div class="action-row">
         <button type="button" data-launch-action="inbound">入庫へ</button>
         <button type="button" data-launch-action="outbound">出庫へ</button>
@@ -731,7 +678,7 @@
     <section id="qrPanel" class="panel hidden" data-panel="qr">
       <div class="section-title">
         <h2>QR印刷</h2>
-        <span class="muted">A-one 72206 / A4横 / 2列3行</span>
+        <span class="muted">標準カメラ用QR / A-one 72206 / A4横 / 2列3行</span>
       </div>
       <div class="qr-pick-grid">
         <label class="pallet-pick-field">左列パレット番号
@@ -765,7 +712,6 @@
           <label>パレット番号
             <input id="inPalletNo" autocomplete="off">
           </label>
-          <button type="button" class="scan-button" data-scan-target="inPalletNo">読取</button>
         </div>
         <label>備考
           <input id="inMemo">
@@ -793,7 +739,6 @@
           <label>パレット番号
             <input id="outPalletNo" autocomplete="off">
           </label>
-          <button type="button" class="scan-button" data-scan-target="outPalletNo">読取</button>
         </div>
         <label>備考
           <input id="outMemo">
@@ -822,7 +767,6 @@
           <label>動かすパレット番号
             <input id="moveStartPalletNo" autocomplete="off">
           </label>
-          <button type="button" class="scan-button" data-scan-target="moveStartPalletNo">読取</button>
         </div>
         <label>備考
           <input id="moveStartMemo">
@@ -849,7 +793,6 @@
           <label>確定するパレット番号
             <input id="moveDonePalletNo" autocomplete="off">
           </label>
-          <button type="button" class="scan-button" data-scan-target="moveDonePalletNo">読取</button>
         </div>
         <label>備考
           <input id="moveDoneMemo">
@@ -951,25 +894,6 @@
     </section>
   </main>
 
-  <div id="scannerPanel" class="scanner-panel hidden">
-    <div class="scanner-box">
-      <video id="scannerVideo" autoplay muted playsinline></video>
-      <div class="action-row">
-        <button type="button" id="stopScanBtn" class="secondary">閉じる</button>
-      </div>
-    </div>
-  </div>
-  <div id="cameraHelpPanel" class="camera-help-panel hidden">
-    <div class="camera-help-box">
-      <h3>カメラを許可できませんでした</h3>
-      <p>LINE内ブラウザでカメラが拒否されています。LINEのアプリ権限が許可済みでも、Webページ側のカメラが使えない場合があります。</p>
-      <p>外部ブラウザで開くと読取できる可能性があります。</p>
-      <div class="action-row">
-        <button type="button" id="openExternalBrowserBtn">外部ブラウザで開く</button>
-        <button type="button" id="closeCameraHelpBtn" class="secondary">このまま手入力</button>
-      </div>
-    </div>
-  </div>
   <div id="toast" class="hidden"></div>
 
   <script>
@@ -989,7 +913,6 @@
       qrPrint: { left: '', right: '' },
       masterDraftKey: '',
       masterUnavailable: new Set(),
-      scanner: null,
       apiBridge: {
         frame: null,
         ready: false,
@@ -1021,7 +944,6 @@
     function bindEvents() {
       document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
       document.querySelectorAll('[data-launch-action]').forEach(btn => btn.addEventListener('click', () => applyLaunchAction(btn.dataset.launchAction)));
-      document.querySelectorAll('[data-scan-target]').forEach(btn => btn.addEventListener('click', () => startScanner(btn.dataset.scanTarget)));
       document.addEventListener('click', event => {
         if (!event.target.closest('.producer-cell')) closeProducerSuggestions();
         if (!event.target.closest('.pallet-pick-field')) closePalletSuggestions();
@@ -1084,9 +1006,6 @@
       $('saveLocationsBtn').addEventListener('click', () => withBusy('saveLocationsBtn', '保存中...', saveLocations));
       $('addWorkerBtn').addEventListener('click', addWorkerRow);
       $('saveWorkersBtn').addEventListener('click', () => withBusy('saveWorkersBtn', '保存中...', saveWorkers));
-      $('stopScanBtn').addEventListener('click', stopScanner);
-      $('openExternalBrowserBtn').addEventListener('click', openExternalBrowser);
-      $('closeCameraHelpBtn').addEventListener('click', hideCameraHelp);
     }
 
     async function withBusy(buttonId, busyText, task) {
@@ -1538,7 +1457,7 @@
       const details = detailsFor(pallet.palletNo);
       return `
         <div class="qr-label">
-          <div class="qr-code">${qrSvg(pallet.palletNo)}</div>
+          <div class="qr-code">${qrSvg(qrLaunchUrl(pallet.palletNo))}</div>
           <div class="qr-meta">
             <div class="qr-title-line">
               <div class="pallet-no">${esc(pallet.palletNo)}</div>
@@ -1549,6 +1468,12 @@
           </div>
         </div>
       `;
+    }
+
+    function qrLaunchUrl(palletNo) {
+      const url = new URL(APP_HOME_URL);
+      url.searchParams.set('p', palletNo);
+      return url.toString();
     }
 
     function detailMiniTable(details) {
@@ -2310,156 +2235,6 @@
         hour: '2-digit',
         minute: '2-digit'
       });
-    }
-
-    async function startScanner(targetId) {
-      await startCameraScanner(targetId);
-    }
-
-    async function startCameraScanner(targetId) {
-      try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('このブラウザではカメラを直接起動できません。');
-        }
-        const stream = await getCameraStream();
-        const video = $('scannerVideo');
-        video.srcObject = stream;
-        await video.play();
-        $('scannerPanel').classList.remove('hidden');
-        let detector = null;
-        if ('BarcodeDetector' in window) {
-          try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; }
-        }
-        state.scanner = { targetId, stream, detector, active: true, canvas: document.createElement('canvas'), raf: 0 };
-        scanLoop();
-      } catch (error) {
-        focusManualInput(targetId);
-        if (isPermissionDeniedError(error)) showCameraHelp();
-        showToast(cameraErrorMessage(error), true);
-      }
-    }
-
-    async function getCameraStream() {
-      const attempts = [
-        { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-        { video: { facingMode: { ideal: 'environment' } }, audio: false },
-        { video: true, audio: false }
-      ];
-      let lastError = null;
-      for (const constraints of attempts) {
-        try {
-          return await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (error) {
-          lastError = error;
-          if (isPermissionDeniedError(error)) throw error;
-        }
-      }
-      throw lastError || new Error('カメラを起動できませんでした。');
-    }
-
-    function isPermissionDeniedError(error) {
-      const name = error && error.name ? String(error.name) : '';
-      const message = error && error.message ? String(error.message) : '';
-      return /NotAllowedError|SecurityError/i.test(name) || /permission denied|permission dismissed|denied|許可/i.test(message);
-    }
-
-    function cameraErrorMessage(error) {
-      if (isPermissionDeniedError(error)) {
-        return 'カメラ権限が拒否されています。外部ブラウザで開くか、このまま手入力してください。';
-      }
-      const name = error && error.name ? String(error.name) : '';
-      const message = error && error.message ? String(error.message) : '';
-      if (/NotFoundError|DevicesNotFoundError/i.test(name)) return 'カメラが見つかりません。端末のカメラ設定を確認し、手入力してください。';
-      if (/NotReadableError|TrackStartError/i.test(name)) return 'カメラを他のアプリが使用中の可能性があります。他のカメラアプリを閉じてから再試行してください。';
-      return message || 'カメラを起動できませんでした。手入力してください。';
-    }
-
-    function focusManualInput(targetId) {
-      const input = $(targetId);
-      if (!input) return;
-      input.focus();
-      input.select && input.select();
-    }
-
-    function showCameraHelp() {
-      $('cameraHelpPanel').classList.remove('hidden');
-    }
-
-    function hideCameraHelp() {
-      $('cameraHelpPanel').classList.add('hidden');
-    }
-
-    function openExternalBrowser() {
-      location.href = externalBrowserUrl();
-    }
-
-    function externalBrowserUrl() {
-      const href = location.href;
-      if (/Android/i.test(navigator.userAgent || '')) {
-        const url = new URL(href);
-        const path = `${url.host}${url.pathname}${url.search}${url.hash}`;
-        return `intent://${path}#Intent;scheme=${url.protocol.replace(':', '')};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(href)};end`;
-      }
-      return href;
-    }
-
-    async function scanLoop() {
-      if (!state.scanner || !state.scanner.active) return;
-      const video = $('scannerVideo');
-      try {
-        let text = '';
-        if (state.scanner.detector) {
-          const codes = await state.scanner.detector.detect(video);
-          if (codes && codes.length) text = codes[0].rawValue || '';
-        }
-        if (!text && window.jsQR && video.videoWidth && video.videoHeight) {
-          const canvas = state.scanner.canvas;
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
-          if (code && code.data) text = code.data;
-        }
-        if (text) {
-          applyScannedText(state.scanner.targetId, text);
-          stopScanner();
-          return;
-        }
-      } catch (error) {
-        console.warn(error);
-      }
-      if (state.scanner && state.scanner.active) state.scanner.raf = requestAnimationFrame(scanLoop);
-    }
-
-    function stopScanner() {
-      if (state.scanner) {
-        state.scanner.active = false;
-        if (state.scanner.raf) cancelAnimationFrame(state.scanner.raf);
-        if (state.scanner.stream) state.scanner.stream.getTracks().forEach(track => track.stop());
-      }
-      state.scanner = null;
-      $('scannerVideo').srcObject = null;
-      $('scannerPanel').classList.add('hidden');
-    }
-
-    function applyScannedText(targetId, text) {
-      const palletNo = extractPalletNo(text);
-      $(targetId).value = palletNo;
-      $(targetId).dispatchEvent(new Event('input'));
-      showToast(`読み取りました: ${palletNo}`);
-    }
-
-    function extractPalletNo(text) {
-      const raw = String(text || '').trim();
-      try {
-        const url = new URL(raw);
-        const value = url.searchParams.get('pallet') || url.searchParams.get('palletNo') || url.searchParams.get('p') || url.searchParams.get('qr');
-        if (value) return value.trim();
-      } catch (e) {}
-      const match = raw.match(/\d{4}-\d{1,}/);
-      return match ? `${match[0].slice(0, 5)}${match[0].slice(5).padStart(4, '0')}` : raw;
     }
 
     function showToast(message, isError = false) {
