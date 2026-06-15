@@ -520,13 +520,6 @@
       overflow-wrap: anywhere;
       line-height: 1.25;
     }
-    .producer-option .producer-no {
-      display: block;
-      margin-top: 2px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.2;
-    }
     .producer-no-match {
       padding: 10px;
       color: var(--muted);
@@ -1668,7 +1661,6 @@
         box.innerHTML = producers.map(p => `
           <button type="button" class="producer-option" data-producer-pick="${esc(p.producerNo)}" data-producer-source="${esc(p.producerSource)}">
             <span class="producer-name">${esc(p.producerName || '(名称なし)')}</span>
-            <span class="producer-no">${esc(producerOptionCode(p))}</span>
           </button>
         `).join('');
       }
@@ -2862,7 +2854,7 @@
 
     function producerChoiceDisplay(producer) {
       const p = enrichProducer(producer);
-      return `${p.producerName || '(名称なし)'} / ${p.producerDisplayNo}`;
+      return p.producerName || '(名称なし)';
     }
 
     function producerOptionCode(producer) {
