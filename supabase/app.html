@@ -2748,16 +2748,43 @@
       const target = cleanText(producerNo);
       if (!target) return null;
       const info = parseProducerNo(target, sourceHint);
-      const producers = activeProducers();
-      const exact = producers.find(p => cleanText(p.producerNo) === target && p.producerSource === info.source);
-      if (exact) return exact;
-      return producers.find(p => p.producerSource === info.source && p.producerBaseNumber === info.baseNumber) || null;
+      return findProducerByParsedInfo(info, target);
     }
 
     function findProducerFromInputCode(value) {
       const info = parseProducerInputCode(value);
       if (!info.baseNumber) return null;
-      return activeProducers().find(p => p.producerSource === info.source && p.producerBaseNumber === info.baseNumber) || null;
+      return findProducerByParsedInfo(info, cleanText(value));
+    }
+
+    function findProducerByParsedInfo(info, target = '') {
+      if (!info || !info.source || !info.baseNumber) return null;
+      const candidates = activeProducers()
+        .filter(p => p.producerSource === info.source && p.producerBaseNumber === info.baseNumber)
+        .sort((a, b) => producerMatchRank(a, info) - producerMatchRank(b, info) || compareProducer(a, b));
+      if (!candidates.length) return null;
+      const exact = candidates.find(p => cleanText(p.producerNo) === target);
+      return exact || candidates[0];
+    }
+
+    function producerMatchRank(producer, info) {
+      const digits = producerRawDigits(producer);
+      const plain = String(info.baseNumber);
+      if (info.source === 'D') {
+        const padded = padNumber(info.baseNumber, 2);
+        if (digits === padded) return 0;
+        if (digits === plain) return 1;
+        return 10;
+      }
+      const padded = padNumber(info.baseNumber, 3);
+      if (digits === padded) return 0;
+      if (digits === plain) return 1;
+      if ((info.digits || '').length >= 4 && digits.length === 2 && digits === padNumber(info.baseNumber, 2)) return 50;
+      return 10;
+    }
+
+    function producerRawDigits(producer) {
+      return cleanText(producer && producer.producerNo).replace(/[^\d]/g, '');
     }
 
     function enrichProducer(producer) {
@@ -2806,6 +2833,7 @@
         source,
         baseNo: source === 'D' ? padNumber(baseNumber, 2) : String(baseNumber),
         baseNumber,
+        digits,
         displayNo: padNumber(baseNumber, 3)
       };
     }
@@ -2903,7 +2931,7 @@
 
     function resolveProducerName(detail) {
       const producer = resolveProducerForDetail(detail);
-      return detail.producerName || (producer && producer.producerName) || '';
+      return (producer && producer.producerName) || detail.producerName || '';
     }
     function qrProducerLabel(detail) {
       return [detail.producerNo, resolveProducerName(detail)].filter(Boolean).join(' ');
