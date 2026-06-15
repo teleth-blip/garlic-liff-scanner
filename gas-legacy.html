@@ -7,7 +7,6 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg: #f3f6f4;
@@ -814,9 +813,7 @@
   <div id="toast" class="hidden"></div>
 
   <script>
-    const SUPABASE_URL = 'https://yedrlbrzrkbtgswzplia.supabase.co';
-    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_TiUI0G7_5emKLNINYjRJmA_NluL-UYb';
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwV9IecaDNZL6sfojQxGZjZ4wlS19nzJkWJi4ZkiaCnNlLx8yoD1UzgQbAcMgPErwt3DA/exec';
     const APP_HOME_URL = location.origin + location.pathname;
     const LIFF_ID = '2010379383-rwQBpt0b';
     const state = {
@@ -851,6 +848,7 @@
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const num = value => Number(value || 0).toLocaleString('ja-JP');
 
+    window.addEventListener('message', handleApiBridgeMessage);
     document.addEventListener('DOMContentLoaded', init);
 
     async function init() {
@@ -1765,261 +1763,152 @@
     }
 
     async function api(method, payload = {}) {
-      switch (method) {
-        case 'ping':
-          return supabaseRpc('ping_write_api');
-        case 'getWorkers':
-          return getSupabaseWorkersData();
-        case 'getAppData':
-          return getSupabaseAppData();
-        case 'registerPallet':
-        case 'updatePallet':
-          return writeAndRefresh('upsert_pallet', {
-            p_payload: {
-              workerId: state.workerId,
-              palletNo: payload.palletNo,
-              cropYear: payload.productionYear,
-              serialNo: palletSerialFromNo(payload.palletNo),
-              status: payload.status,
-              memo: payload.memo,
-              details: payload.details || []
-            }
-          });
-        case 'deletePallet':
-          return writeAndRefresh('delete_pallet_rpc', {
-            p_worker_id: state.workerId,
-            p_pallet_no: payload.palletNo,
-            p_memo: payload.memo || ''
-          });
-        case 'recordInbound':
-          return writeAndRefresh('record_inbound', {
-            p_worker_id: state.workerId,
-            p_pallet_no: payload.palletNo,
-            p_location_id: payload.locationId,
-            p_memo: payload.memo || ''
-          });
-        case 'recordOutbound':
-          return writeAndRefresh('record_outbound', {
-            p_worker_id: state.workerId,
-            p_pallet_no: payload.palletNo,
-            p_memo: payload.memo || ''
-          });
-        case 'startMove':
-          return writeAndRefresh('start_move', {
-            p_worker_id: state.workerId,
-            p_pallet_no: payload.palletNo,
-            p_memo: payload.memo || ''
-          });
-        case 'completeMove':
-          return writeAndRefresh('complete_move', {
-            p_worker_id: state.workerId,
-            p_pallet_no: payload.palletNo,
-            p_location_id: payload.locationId,
-            p_memo: payload.memo || ''
-          });
-        case 'saveStandards':
-        case 'saveCoolers':
-        case 'saveLocationGrid':
-        case 'saveWorkers':
-          throw new Error('Supabase版のマスタ編集は次の段階です。現在は既存版で編集してください。');
-        default:
-          throw new Error(`未対応のAPIです: ${method || '(空)'}`);
+      if (method === 'getAppData' || method === 'getWorkers' || method === 'ping') {
+        return firstSuccessfulApi([
+          () => apiViaJsonp(method, payload),
+          () => apiViaBridge(method, payload)
+        ]);
+      }
+      try {
+        return await apiViaBridge(method, payload);
+      } catch (error) {
+        if (error.requestSent && method !== 'getAppData' && method !== 'getWorkers' && method !== 'ping') throw error;
+        return apiViaJsonp(method, payload);
       }
     }
 
-    async function writeAndRefresh(fn, args) {
-      const result = await supabaseRpc(fn, args);
-      const fresh = await getSupabaseAppData();
-      return Object.assign({ ok: true, message: '保存しました。' }, fresh, result || {});
+    function firstSuccessfulApi(tasks) {
+      return new Promise((resolve, reject) => {
+        let failures = 0;
+        let lastError = null;
+        tasks.forEach(run => {
+          run().then(resolve).catch(error => {
+            failures += 1;
+            lastError = error;
+            if (failures === tasks.length) reject(lastError || new Error('Apps Script APIを読み込めませんでした。'));
+          });
+        });
+      });
     }
 
-    async function supabaseRpc(fn, args = {}) {
-      const { data, error } = await supabaseClient.rpc(fn, args);
-      if (error) throw new Error(error.message);
-      if (data && data.ok === false) throw new Error(data.error || 'APIエラーです。');
-      return data || { ok: true };
-    }
-
-    async function getSupabaseWorkersData() {
-      const workers = await selectAll('workers', query => query.order('display_order', { ascending: true }).order('worker_id', { ascending: true }));
-      return {
-        ok: true,
-        master: {
-          workers: workers.map(mapWorker)
+    function apiViaBridge(method, payload = {}) {
+      return ensureApiBridge().then(() => new Promise((resolve, reject) => {
+        const id = `bridge_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const timer = setTimeout(() => {
+          delete state.apiBridge.pending[id];
+          const error = new Error('Apps Script APIが応答しませんでした。');
+          error.requestSent = true;
+          reject(error);
+        }, 45000);
+        state.apiBridge.pending[id] = { resolve, reject, timer };
+        try {
+          state.apiBridge.frame.contentWindow.postMessage({
+            type: 'garlic-api-request',
+            id,
+            request: { method, workerId: state.workerId, payload }
+          }, '*');
+        } catch (error) {
+          clearTimeout(timer);
+          delete state.apiBridge.pending[id];
+          error.bridgeUnavailable = true;
+          reject(error);
         }
-      };
+      }));
     }
 
-    async function getSupabaseAppData() {
-      const [
-        workers,
-        standards,
-        coolers,
-        locations,
-        producers,
-        pallets,
-        details,
-        placements,
-        moving
-      ] = await Promise.all([
-        selectAll('workers', query => query.order('display_order', { ascending: true }).order('worker_id', { ascending: true })),
-        selectAll('standards', query => query.order('display_order', { ascending: true }).order('standard_id', { ascending: true })),
-        selectAll('coolers', query => query.order('cooler_id', { ascending: true })),
-        selectAll('locations', query => query.order('cooler_id', { ascending: true }).order('level_no', { ascending: true }).order('row_no', { ascending: true }).order('col_no', { ascending: true })),
-        selectAll('producers', query => query.order('producer_no', { ascending: true })),
-        selectAll('pallets', query => query.order('pallet_no', { ascending: true })),
-        selectAll('pallet_detail_view', query => query.order('pallet_no', { ascending: true }).order('detail_no', { ascending: true })),
-        selectAll('placements', query => query.order('location_id', { ascending: true })),
-        selectAll('moving_pallets', query => query.order('started_at', { ascending: true }))
-      ]);
-      const locationNames = Object.fromEntries(locations.map(location => [location.location_id, location.display_name || location.location_id]));
-      return {
-        ok: true,
-        master: {
-          workers: workers.map(mapWorker),
-          standards: standards.map(mapStandard),
-          coolers: coolers.map(mapCooler),
-          locations: locations.map(mapLocation),
-          producers: producers.map(mapProducer),
-          producerSync: { lastSyncedAt: '', fileUpdatedAt: '', sourceName: 'Supabase' }
-        },
-        pallets: pallets.map(pallet => mapPallet(pallet, locationNames)),
-        details: details.map(mapDetail),
-        placements: placements.map(mapPlacement),
-        moving: moving.map(row => mapMoving(row, locationNames)),
-        histories: []
-      };
+    function ensureApiBridge() {
+      if (state.apiBridge.ready) return Promise.resolve();
+      if (state.apiBridge.readyPromise) return state.apiBridge.readyPromise;
+      state.apiBridge.readyPromise = new Promise((resolve, reject) => {
+        state.apiBridge.readyResolve = resolve;
+        state.apiBridge.readyReject = reject;
+        const timer = setTimeout(() => {
+          if (state.apiBridge.ready) return;
+          const error = new Error('Apps Script通信フレームを起動できませんでした。');
+          error.bridgeUnavailable = true;
+          reject(error);
+        }, 9000);
+        const frame = document.createElement('iframe');
+        frame.hidden = true;
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.display = 'none';
+        frame.src = `${GAS_API_URL}?bridge=1&parent=${encodeURIComponent(location.origin)}&_=${Date.now()}`;
+        frame.onerror = () => {
+          clearTimeout(timer);
+          const error = new Error('Apps Script通信フレームを読み込めませんでした。');
+          error.bridgeUnavailable = true;
+          reject(error);
+        };
+        state.apiBridge.frame = frame;
+        state.apiBridge.readyTimer = timer;
+        document.body.appendChild(frame);
+      });
+      return state.apiBridge.readyPromise;
     }
 
-    async function selectAll(table, configure) {
-      let query = supabaseClient.from(table).select('*');
-      if (configure) query = configure(query);
-      const { data, error } = await query;
-      if (error) throw new Error(`${table}: ${error.message}`);
-      return data || [];
+    function handleApiBridgeMessage(event) {
+      if (!isApiBridgeOrigin(event.origin)) return;
+      const message = event.data || {};
+      if (message.type === 'garlic-api-ready') {
+        state.apiBridge.ready = true;
+        if (state.apiBridge.readyTimer) clearTimeout(state.apiBridge.readyTimer);
+        if (state.apiBridge.readyResolve) state.apiBridge.readyResolve();
+        return;
+      }
+      if (message.type !== 'garlic-api-response') return;
+      const pending = state.apiBridge.pending[message.id];
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      delete state.apiBridge.pending[message.id];
+      const response = message.response;
+      if (!response || response.ok === false) {
+        pending.reject(new Error(response && response.error ? response.error : 'APIエラーです。'));
+      } else {
+        pending.resolve(response);
+      }
     }
 
-    function mapWorker(row) {
-      return {
-        workerId: row.worker_id,
-        workerName: row.worker_name || row.worker_id,
-        role: row.role || 'operator',
-        displayOrder: toNumber(row.display_order),
-        active: row.active !== false,
-        note: row.note || ''
-      };
+    function isApiBridgeOrigin(origin) {
+      return origin === 'https://script.google.com' || /\.googleusercontent\.com$/.test(origin);
     }
 
-    function mapStandard(row) {
-      return {
-        standardId: row.standard_id,
-        standardName: row.standard_name || row.standard_id,
-        displayOrder: toNumber(row.display_order),
-        active: row.active !== false
-      };
-    }
-
-    function mapCooler(row) {
-      return {
-        coolerId: row.cooler_id,
-        coolerName: row.cooler_name || row.cooler_id,
-        maxLevel: toNumber(row.max_levels),
-        rowCount: toNumber(row.row_count),
-        colCount: toNumber(row.col_count),
-        active: row.active !== false
-      };
-    }
-
-    function mapLocation(row) {
-      return {
-        locationId: row.location_id,
-        coolerId: row.cooler_id,
-        level: toNumber(row.level_no),
-        row: toNumber(row.row_no),
-        col: toNumber(row.col_no),
-        displayName: row.display_name || row.location_id,
-        available: row.usable !== false,
-        note: row.note || ''
-      };
-    }
-
-    function mapProducer(row) {
-      return {
-        producerNo: row.producer_no,
-        producerName: row.producer_name || ''
-      };
-    }
-
-    function mapPallet(row, locationNames) {
-      const locationId = row.current_location_id || '';
-      return {
-        palletNo: row.pallet_no,
-        productionYear: String(row.crop_year || ''),
-        serialNo: toNumber(row.serial_no),
-        weight: toNumber(row.weight),
-        memo: row.memo || '',
-        status: row.status || '未配置',
-        currentLocationId: locationId,
-        currentLocationName: locationNames[locationId] || locationId,
-        registeredAt: formatDateTimeText(row.registered_at),
-        updatedAt: formatDateTimeText(row.updated_at)
-      };
-    }
-
-    function mapDetail(row) {
-      return {
-        palletNo: row.pallet_no,
-        detailNo: toNumber(row.detail_no),
-        producerNo: row.producer_no || '',
-        producerName: row.producer_name || '',
-        standard: row.standard || '',
-        weight: toNumber(row.weight),
-        price: toNumber(row.price),
-        memo: row.memo || ''
-      };
-    }
-
-    function mapPlacement(row) {
-      return {
-        locationId: row.location_id,
-        palletNo: row.pallet_no || '',
-        status: row.status || '使用中',
-        updatedAt: formatDateTimeText(row.updated_at)
-      };
-    }
-
-    function mapMoving(row, locationNames) {
-      const fromLocationId = row.from_location_id || '';
-      return {
-        palletNo: row.pallet_no,
-        fromLocationId,
-        fromLocationName: locationNames[fromLocationId] || fromLocationId,
-        startedAt: formatDateTimeText(row.started_at),
-        workerId: row.worker_id || '',
-        memo: row.memo || ''
-      };
-    }
-
-    function palletSerialFromNo(palletNo) {
-      const match = String(palletNo || '').match(/-(\d+)$/);
-      return match ? Number(match[1]) : 0;
-    }
-
-    function toNumber(value) {
-      const number = Number(value || 0);
-      return Number.isFinite(number) ? number : 0;
-    }
-
-    function formatDateTimeText(value) {
-      if (!value) return '';
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return String(value);
-      return date.toLocaleString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+    function apiViaJsonp(method, payload = {}) {
+      return new Promise((resolve, reject) => {
+        window.__garlicApiCallbacks = window.__garlicApiCallbacks || {};
+        const id = `cb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const cbName = `__garlicApiCallbacks.${id}`;
+        const url = new URL(GAS_API_URL);
+        url.searchParams.set('api', '1');
+        url.searchParams.set('method', method);
+        url.searchParams.set('callback', cbName);
+        url.searchParams.set('_', String(Date.now()));
+        if (state.workerId) url.searchParams.set('workerId', state.workerId);
+        if (payload && Object.keys(payload).length) url.searchParams.set('payload', JSON.stringify(payload));
+        if (url.toString().length > 18000) {
+          reject(new Error('送信内容が大きすぎます。分割して保存してください。'));
+          return;
+        }
+        const script = document.createElement('script');
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error('Apps Script APIが応答しませんでした。'));
+        }, 30000);
+        function cleanup() {
+          clearTimeout(timer);
+          delete window.__garlicApiCallbacks[id];
+          script.remove();
+        }
+        window.__garlicApiCallbacks[id] = response => {
+          cleanup();
+          if (!response || response.ok === false) reject(new Error(response && response.error ? response.error : 'APIエラーです。'));
+          else resolve(response);
+        };
+        script.onerror = () => {
+          cleanup();
+          reject(new Error('Apps Script APIを読み込めませんでした。'));
+        };
+        script.src = url.toString();
+        document.head.appendChild(script);
       });
     }
 

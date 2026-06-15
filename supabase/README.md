@@ -46,7 +46,7 @@ Supabase版で登録・入庫・出庫・移動を安全に実行するため、
 
 ## 4. 接続確認
 
-GitHub Pagesに反映後、次のURLを開きます。
+GitHub Pagesに反映後、次の確認URLを開きます。
 
 ```text
 https://teleth-blip.github.io/garlic-liff-scanner/supabase/
@@ -55,20 +55,26 @@ https://teleth-blip.github.io/garlic-liff-scanner/supabase/
 `接続OK` と表示され、作業者が表示されればSupabase接続は成功です。
 `RPC状態` が `RPC接続OK` になれば、書き込み用RPCも準備済みです。
 
-DB版アプリ:
+正式版アプリ:
 
 ```text
-https://teleth-blip.github.io/garlic-liff-scanner/supabase/app.html
+https://teleth-blip.github.io/garlic-liff-scanner/
 ```
 
 ## 5. 現在の運用への影響
 
-この作業は既存のスプレッドシート版には影響しません。
+この作業は既存のスプレッドシート本体には影響しません。
 
-既存版:
+正式版:
 
 ```text
 https://teleth-blip.github.io/garlic-liff-scanner/
+```
+
+旧GAS版:
+
+```text
+https://teleth-blip.github.io/garlic-liff-scanner/gas-legacy.html
 ```
 
 Supabase版準備確認:
