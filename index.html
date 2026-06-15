@@ -1545,13 +1545,13 @@
     }
 
     function renderWorkers() {
-      $('workerSelect').innerHTML = activeWorkers().map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}（${esc(w.workerId)}）</option>`).join('');
+      $('workerSelect').innerHTML = activeWorkers().map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}</option>`).join('');
       $('workerSelect').value = state.workerId;
     }
 
     function renderLoginWorkers() {
       const workers = activeWorkers();
-      $('loginWorkerSelect').innerHTML = workers.map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}（${esc(w.workerId)}）</option>`).join('');
+      $('loginWorkerSelect').innerHTML = workers.map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}</option>`).join('');
       if (state.workerId && workers.some(w => w.workerId === state.workerId)) $('loginWorkerSelect').value = state.workerId;
     }
 
