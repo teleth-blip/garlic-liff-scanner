@@ -323,6 +323,10 @@
       background: #fff7ed;
       color: #7a3f00;
     }
+    .setting-status {
+      margin-top: 10px;
+      font-size: 13px;
+    }
     .muted { color: var(--muted); }
     .panel-note {
       margin-bottom: 10px;
@@ -1075,6 +1079,23 @@
         </div>
       </details>
       <details class="master-section">
+        <summary>生産者マスタ</summary>
+        <div class="master-body">
+          <div class="form-grid">
+            <label>Excelファイルパス
+              <input id="producerSourcePath" type="text" autocomplete="off">
+            </label>
+            <label>シート名
+              <input id="producerSheetName" type="text" autocomplete="off">
+            </label>
+          </div>
+          <div id="producerSourceStatus" class="notice setting-status"></div>
+          <div class="action-row">
+            <button type="button" id="saveProducerSettingsBtn">保存</button>
+          </div>
+        </div>
+      </details>
+      <details class="master-section">
         <summary>操作履歴</summary>
         <div class="master-body">
           <div class="table-wrap">
@@ -1092,6 +1113,10 @@
     const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_TiUI0G7_5emKLNINYjRJmA_NluL-UYb';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
     const APP_HOME_URL = location.origin + location.pathname;
+    const DEFAULT_PRODUCER_IMPORT_SOURCE = {
+      path: 'G:\\マイドライブ\\にんにく管理\\令和8年\\にんにく仕入れ管理表 エイト 令和8年産.xlsm',
+      sheetName: '仕入先一覧表'
+    };
     const state = {
       data: null,
       workers: [],
@@ -1215,6 +1240,7 @@
       $('saveLocationsBtn').addEventListener('click', () => withBusy('saveLocationsBtn', '保存中...', saveLocations));
       $('addWorkerBtn').addEventListener('click', addWorkerRow);
       $('saveWorkersBtn').addEventListener('click', () => withBusy('saveWorkersBtn', '保存中...', saveWorkers));
+      $('saveProducerSettingsBtn').addEventListener('click', () => withBusy('saveProducerSettingsBtn', '保存中...', saveProducerSettings));
     }
 
     async function withBusy(buttonId, busyText, task) {
@@ -2263,6 +2289,7 @@
       renderStandardRows();
       renderCoolerRows();
       renderWorkerRows();
+      renderProducerSettings();
       renderHistoryRows();
       renderMasterGrid();
     }
@@ -2406,6 +2433,34 @@
       await saveRows('saveWorkers', 'workerRows');
     }
 
+    function renderProducerSettings() {
+      const sync = (state.data && state.data.master && state.data.master.producerSync) || DEFAULT_PRODUCER_IMPORT_SOURCE;
+      $('producerSourcePath').value = sync.path || '';
+      $('producerSheetName').value = sync.sheetName || DEFAULT_PRODUCER_IMPORT_SOURCE.sheetName;
+      const countText = [sync.aCount ? `A列 ${sync.aCount}件` : '', sync.dCount ? `D列 ${sync.dCount}件` : '']
+        .filter(Boolean)
+        .join(' / ');
+      const updatedText = sync.lastSyncedAt ? `最終取込 ${formatDateTimeText(sync.lastSyncedAt)}` : '未取込';
+      $('producerSourceStatus').textContent = countText ? `${updatedText} / ${countText}` : updatedText;
+    }
+
+    async function saveProducerSettings() {
+      try {
+        const path = $('producerSourcePath').value.trim();
+        const sheetName = $('producerSheetName').value.trim() || DEFAULT_PRODUCER_IMPORT_SOURCE.sheetName;
+        if (!path) throw new Error('Excelファイルパスを入力してください。');
+        const res = await api('saveProducerSettings', {
+          path,
+          sheetName,
+          sourceName: 'Excel',
+          updatedAt: new Date().toISOString()
+        });
+        applyDataResponse(res);
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
     function renderHistoryRows() {
       if (!state.data.histories || !state.data.histories.length) {
         $('historyRows').innerHTML = '<tr><td colspan="6" class="muted">操作履歴は画面表示を高速化するため読み込んでいません。</td></tr>';
@@ -2505,6 +2560,12 @@
             p_location_id: payload.locationId,
             p_memo: payload.memo || ''
           });
+        case 'saveProducerSettings':
+          return writeAndRefresh('save_app_setting', {
+            p_worker_id: state.workerId,
+            p_setting_key: 'producer_import_source',
+            p_setting_value: payload
+          });
         case 'saveStandards':
         case 'saveCoolers':
         case 'saveLocationGrid':
@@ -2548,7 +2609,8 @@
         pallets,
         details,
         placements,
-        moving
+        moving,
+        appSettings
       ] = await Promise.all([
         selectAll('workers', query => query.order('display_order', { ascending: true }).order('worker_id', { ascending: true })),
         selectAll('standards', query => query.order('display_order', { ascending: true }).order('standard_id', { ascending: true })),
@@ -2558,8 +2620,10 @@
         selectAll('pallets', query => query.order('pallet_no', { ascending: true })),
         selectAll('pallet_detail_view', query => query.order('pallet_no', { ascending: true }).order('detail_no', { ascending: true })),
         selectAll('placements', query => query.order('location_id', { ascending: true })),
-        selectAll('moving_pallets', query => query.order('started_at', { ascending: true }))
+        selectAll('moving_pallets', query => query.order('started_at', { ascending: true })),
+        optionalSelectAll('app_settings')
       ]);
+      const settings = settingsByKey(appSettings);
       const locationNames = Object.fromEntries(locations.map(location => [location.location_id, location.display_name || location.location_id]));
       return {
         ok: true,
@@ -2569,7 +2633,8 @@
           coolers: coolers.map(mapCooler),
           locations: locations.map(mapLocation),
           producers: producers.map(mapProducer),
-          producerSync: { lastSyncedAt: '', fileUpdatedAt: '', sourceName: 'Supabase' }
+          settings,
+          producerSync: producerSyncFromSettings(settings.producer_import_source)
         },
         pallets: pallets.map(pallet => mapPallet(pallet, locationNames)),
         details: details.map(mapDetail),
@@ -2585,6 +2650,31 @@
       const { data, error } = await query;
       if (error) throw new Error(`${table}: ${error.message}`);
       return data || [];
+    }
+
+    async function optionalSelectAll(table, configure) {
+      try {
+        return await selectAll(table, configure);
+      } catch (error) {
+        console.warn(error.message);
+        return [];
+      }
+    }
+
+    function settingsByKey(rows = []) {
+      return Object.fromEntries(rows.map(row => [row.setting_key, row.setting_value || {}]));
+    }
+
+    function producerSyncFromSettings(setting = {}) {
+      return Object.assign({
+        sourceName: 'Excel',
+        path: DEFAULT_PRODUCER_IMPORT_SOURCE.path,
+        sheetName: DEFAULT_PRODUCER_IMPORT_SOURCE.sheetName,
+        lastSyncedAt: '',
+        fileUpdatedAt: '',
+        aCount: 0,
+        dCount: 0
+      }, setting || {});
     }
 
     function mapWorker(row) {

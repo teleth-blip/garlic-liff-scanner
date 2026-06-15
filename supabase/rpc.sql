@@ -571,10 +571,42 @@ begin
 end;
 $$;
 
+create or replace function public.save_app_setting(p_worker_id text, p_setting_key text, p_setting_value jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_worker public.workers%rowtype;
+  v_key text;
+  v_value jsonb;
+begin
+  v_worker := public.require_active_worker(p_worker_id);
+  v_key := btrim(coalesce(p_setting_key, ''));
+  v_value := coalesce(p_setting_value, '{}'::jsonb);
+
+  if v_key = '' then
+    raise exception '設定キーが空です。';
+  end if;
+
+  insert into public.app_settings (setting_key, setting_value, updated_at)
+  values (v_key, v_value, now())
+  on conflict (setting_key) do update
+    set setting_value = excluded.setting_value,
+        updated_at = now();
+
+  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '設定を保存しました: ' || v_key, '');
+
+  return jsonb_build_object('ok', true, 'message', '設定を保存しました。', 'settingKey', v_key);
+end;
+$$;
+
 revoke all on function public.require_active_worker(text) from public, anon, authenticated;
 revoke all on function public.require_location_can_receive(text) from public, anon, authenticated;
 revoke all on function public.require_location_can_remove(text) from public, anon, authenticated;
 revoke all on function public.write_history(public.workers, text, text, text, text, text, text) from public, anon, authenticated;
+revoke all on function public.save_app_setting(text, text, jsonb) from public, anon, authenticated;
 
 grant execute on function public.ping_write_api() to anon;
 grant execute on function public.upsert_pallet(jsonb) to anon;
@@ -583,3 +615,4 @@ grant execute on function public.record_inbound(text, text, text, text) to anon;
 grant execute on function public.record_outbound(text, text, text) to anon;
 grant execute on function public.start_move(text, text, text) to anon;
 grant execute on function public.complete_move(text, text, text, text) to anon;
+grant execute on function public.save_app_setting(text, text, jsonb) to anon;

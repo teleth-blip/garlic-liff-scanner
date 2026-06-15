@@ -1,11 +1,22 @@
 -- 生産者マスタ再取り込みSQL
--- 元ファイル: C:\Users\eight\マイドライブ\にんにく管理\にんにく仕入れ管理表 エイト 令和6年産.xlsm
+-- 元ファイル: G:\マイドライブ\にんにく管理\令和8年\にんにく仕入れ管理表 エイト 令和8年産.xlsm
 -- シート: 仕入先一覧表
 -- A列/B列 -> producer_source='A', producer_no=3桁
 -- D列/E列 -> producer_source='D', producer_no=2桁
 -- 注意: public.producers を一度空にしてから再投入します。
 
 begin;
+
+create table if not exists public.app_settings (
+  setting_key text primary key,
+  setting_value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_settings enable row level security;
+drop policy if exists anon_read_app_settings on public.app_settings;
+create policy anon_read_app_settings on public.app_settings for select to anon using (true);
+grant select on public.app_settings to anon;
 
 alter table public.producers
   add column if not exists producer_source text not null default 'A';
@@ -30,7 +41,7 @@ values
   ('A', '004', '東 幸信'),
   ('A', '005', '沢居 貴之'),
   ('A', '006', '大鹿 憲一'),
-  ('A', '007', '長谷川 孝弥'),
+  ('A', '007', '長谷川孝弥'),
   ('A', '008', '中村 信男'),
   ('A', '009', '長谷川 一弥'),
   ('A', '010', '樋口 友勝'),
@@ -50,7 +61,7 @@ values
   ('A', '024', '佐藤哲'),
   ('A', '025', '小林弘'),
   ('A', '026', '田島誠'),
-  ('A', '027', '佐藤德秋'),
+  ('A', '027', '(株)さとうファーム'),
   ('A', '028', '-'),
   ('A', '029', '沼岡カヨ'),
   ('A', '030', '佐々木秀幸'),
@@ -226,13 +237,90 @@ values
   ('A', '201', '高橋右京'),
   ('A', '202', '佐々木道子'),
   ('A', '203', '簗場道雄'),
+  ('A', '204', '泉山光夫'),
+  ('A', '205', '後村義隆'),
+  ('A', '206', '市川繁'),
+  ('A', '207', '松田善作'),
+  ('A', '208', '大下内博美'),
+  ('A', '209', '長谷川義央'),
+  ('A', '210', '(株)まるかつ'),
+  ('A', '211', '田嶋豊春'),
+  ('A', '212', '高松ひろみ'),
+  ('A', '213', '二ツ森勇次'),
+  ('A', '214', '古川義志'),
+  ('A', '215', '鶴ヶ崎慎一'),
+  ('A', '216', '川村理次'),
+  ('A', '217', '畑中直美'),
+  ('A', '218', 'ナカムラホーム 中村良夫'),
+  ('A', '219', '山村佳寛'),
+  ('A', '220', '小泉英徳'),
+  ('A', '221', '才神俊夫'),
+  ('A', '222', '舛館和博'),
+  ('A', '223', '小笠原輝'),
+  ('A', '224', '高村定俊'),
+  ('A', '225', '山崎和幸'),
+  ('A', '226', '野崎義弘'),
+  ('A', '227', '畠山園之'),
+  ('A', '228', '砂渡伸一'),
+  ('A', '229', '織笠秀明'),
+  ('A', '230', '川上肇'),
+  ('A', '231', '米内山渉'),
+  ('A', '232', '小田満'),
+  ('A', '233', '(株)マルカ農産'),
+  ('A', '234', '中村司'),
+  ('A', '235', '大成ファーム'),
+  ('A', '236', '柴田俊男'),
+  ('A', '237', '中岫嘉仁'),
+  ('A', '238', '中渡宮子'),
+  ('A', '239', '久野尚樹'),
+  ('A', '240', '中村博光'),
+  ('A', '241', '新谷健朗'),
+  ('A', '242', '青森農産(株)'),
+  ('A', '243', '高森秀明'),
+  ('A', '244', '中野渡繁敏'),
+  ('A', '245', '大久保大一'),
+  ('A', '246', '田嶋大'),
+  ('A', '247', '㈲今蔵'),
+  ('A', '248', '野中耕進'),
+  ('A', '249', '土嶺要'),
+  ('A', '250', '野月政紀'),
+  ('A', '251', '川岸睦'),
+  ('A', '252', '村上奈穂子'),
+  ('A', '253', '竹内幾雄'),
+  ('A', '254', '古川義志'),
+  ('A', '255', '関口久美'),
+  ('A', '256', '甲田一博'),
+  ('A', '257', '一戸学'),
+  ('A', '258', '金見一雄'),
+  ('A', '259', '仁和文雄'),
+  ('A', '260', '田中覚'),
+  ('A', '261', '熊野邦子'),
+  ('A', '262', '山端哲也'),
+  ('A', '263', '藤川靖'),
+  ('A', '264', '佐々木稔'),
+  ('A', '265', '山下清行'),
+  ('A', '266', '三幸金属農業事業部'),
+  ('A', '267', '立崎健一'),
+  ('A', '268', '滝沢誠章'),
+  ('A', '269', '芋田一弘'),
+  ('A', '270', '甲田 繁美'),
+  ('A', '271', '伊沢満二'),
+  ('A', '272', '古川康治'),
+  ('A', '273', '千葉彩加'),
+  ('A', '274', '畠山一'),
+  ('A', '275', '新山智哉'),
+  ('A', '276', '立崎貢大'),
+  ('A', '277', '沖沢福男'),
+  ('A', '278', '佐々木俊明'),
+  ('A', '279', '織笠一考'),
   ('D', '01', '十美商事'),
   ('D', '02', 'ヤマキアネックス'),
   ('D', '03', '吉田屋'),
   ('D', '04', '谷内商店'),
   ('D', '05', 'TF'),
   ('D', '06', '㈱むつ総合卸売市場'),
-  ('D', '07', '高谷商事(株)');
+  ('D', '07', '高谷商事(株)'),
+  ('D', '08', '(株)まるかつ');
 
 alter table public.producers
   add constraint producers_pkey
@@ -263,6 +351,58 @@ left join public.producers p on (
   end
 );
 
+insert into public.app_settings (setting_key, setting_value, updated_at)
+values (
+  'producer_import_source',
+  jsonb_build_object(
+    'sourceName', 'Excel',
+    'path', 'G:\マイドライブ\にんにく管理\令和8年\にんにく仕入れ管理表 エイト 令和8年産.xlsm',
+    'sheetName', '仕入先一覧表',
+    'lastSyncedAt', now()::text,
+    'fileUpdatedAt', '2026-06-15T15:41:28+09:00',
+    'aCount', 278,
+    'dCount', 8
+  ),
+  now()
+)
+on conflict (setting_key) do update
+  set setting_value = excluded.setting_value,
+      updated_at = now();
+
+create or replace function public.save_app_setting(p_worker_id text, p_setting_key text, p_setting_value jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_worker public.workers%rowtype;
+  v_key text;
+  v_value jsonb;
+begin
+  v_worker := public.require_active_worker(p_worker_id);
+  v_key := btrim(coalesce(p_setting_key, ''));
+  v_value := coalesce(p_setting_value, '{}'::jsonb);
+
+  if v_key = '' then
+    raise exception '設定キーが空です。';
+  end if;
+
+  insert into public.app_settings (setting_key, setting_value, updated_at)
+  values (v_key, v_value, now())
+  on conflict (setting_key) do update
+    set setting_value = excluded.setting_value,
+        updated_at = now();
+
+  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '設定を保存しました: ' || v_key, '');
+
+  return jsonb_build_object('ok', true, 'message', '設定を保存しました。', 'settingKey', v_key);
+end;
+$$;
+
+revoke all on function public.save_app_setting(text, text, jsonb) from public, anon, authenticated;
+grant execute on function public.save_app_setting(text, text, jsonb) to anon;
+
 commit;
 
--- 件数メモ: A列 202 件 / D列 7 件 / 合計 209 件
+-- 件数メモ: A列 278 件 / D列 8 件 / 合計 286 件
