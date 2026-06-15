@@ -49,6 +49,12 @@ Supabase版で登録・入庫・出庫・移動を安全に実行するため、
 
 既存データの表示名だけを補修する場合は、`fix-producer-display-names.sql` をSupabaseの `SQL Editor` で実行します。
 
+生産者番号は、Excel上の番号をそのまま明細へ保存しません。
+A列由来の生産者は `令和年 + 3桁番号` に変換します。例: 278番を令和8年に仕入れた場合は `8278`。
+D列由来の生産者は `令和年 + 月日 + 2桁番号` に変換します。例: 01番を令和8年6月15日に仕入れた場合は `8061501`。
+
+既存SupabaseプロジェクトでA列/D列の区別をDBに持たせる場合は、`producer-number-rules.sql` をSupabaseの `SQL Editor` で実行します。
+
 ## 4. 接続確認
 
 GitHub Pagesに反映後、次の確認URLを開きます。

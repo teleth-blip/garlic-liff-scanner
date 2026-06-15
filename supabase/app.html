@@ -1231,18 +1231,18 @@
       const list = $('producerOptions');
       if (!list) return;
       list.innerHTML = activeProducers()
-        .map(p => `<option value="${esc(producerDisplayValue(p.producerNo))}"></option>`)
+        .map(p => `<option value="${esc(producerChoiceDisplay(p))}"></option>`)
         .join('');
     }
 
     function producerDisplayValue(producerNo) {
       const producer = findProducer(producerNo);
-      return producer ? `${producer.producerName} / ${producer.producerNo}` : cleanText(producerNo);
+      return producer ? producerChoiceDisplay(producer) : cleanText(producerNo);
     }
 
     function applyProducerSearch(row, value) {
       const producer = findProducerByDisplay(value);
-      if (producer) row.querySelector('[data-detail="producerNo"]').value = producer.producerNo;
+      if (producer) row.querySelector('[data-detail="producerNo"]').value = buildStoredProducerNo(producer);
     }
 
     function renderProducerSuggestions(row, value) {
@@ -1253,16 +1253,16 @@
       const producers = activeProducers()
         .filter(p => {
           if (!query) return true;
-          return `${p.producerNo} ${p.producerName}`.toLowerCase().includes(query);
+          return producerSearchText(p).toLowerCase().includes(query);
         })
         .slice(0, 60);
       if (!producers.length) {
         box.innerHTML = '<div class="producer-no-match">該当なし</div>';
       } else {
         box.innerHTML = producers.map(p => `
-          <button type="button" class="producer-option" data-producer-pick="${esc(p.producerNo)}">
+          <button type="button" class="producer-option" data-producer-pick="${esc(p.producerNo)}" data-producer-source="${esc(p.producerSource)}">
             <span class="producer-name">${esc(p.producerName || '(名称なし)')}</span>
-            <span class="producer-no">${esc(p.producerNo)}</span>
+            <span class="producer-no">${esc(producerOptionCode(p))}</span>
           </button>
         `).join('');
       }
@@ -1270,20 +1270,20 @@
       box.querySelectorAll('[data-producer-pick]').forEach(btn => {
         btn.addEventListener('pointerdown', event => {
           event.preventDefault();
-          selectProducer(row, btn.dataset.producerPick);
+          selectProducer(row, btn.dataset.producerPick, btn.dataset.producerSource);
         });
         btn.addEventListener('click', event => {
           event.preventDefault();
-          selectProducer(row, btn.dataset.producerPick);
+          selectProducer(row, btn.dataset.producerPick, btn.dataset.producerSource);
         });
       });
     }
 
-    function selectProducer(row, producerNo) {
-      const producer = findProducer(producerNo);
+    function selectProducer(row, producerNo, sourceHint = '') {
+      const producer = findProducer(producerNo, sourceHint);
       if (!producer) return;
-      row.querySelector('[data-detail="producerSearch"]').value = producerDisplayValue(producer.producerNo);
-      row.querySelector('[data-detail="producerNo"]').value = producer.producerNo;
+      row.querySelector('[data-detail="producerSearch"]').value = producerChoiceDisplay(producer);
+      row.querySelector('[data-detail="producerNo"]').value = buildStoredProducerNo(producer);
       closeProducerSuggestions();
     }
 
@@ -1297,7 +1297,18 @@
     function findProducerByDisplay(value) {
       const text = cleanText(value);
       if (!text) return null;
-      return activeProducers().find(p => producerDisplayValue(p.producerNo) === text || p.producerNo === text || p.producerName === text) || null;
+      const lower = text.toLowerCase();
+      return activeProducers().find(p => {
+        const values = [
+          producerChoiceDisplay(p),
+          producerOptionCode(p),
+          p.producerNo,
+          p.producerName,
+          p.producerDisplayNo,
+          buildStoredProducerNo(p)
+        ];
+        return values.some(v => cleanText(v) === text) || producerSearchText(p).toLowerCase() === lower;
+      }) || null;
     }
 
     function clearRegisterForm() {
@@ -1357,7 +1368,7 @@
     function collectDetails() {
       updateRegisterWeight();
       return Array.from($('detailRows').querySelectorAll('tr')).map(tr => ({
-        producerNo: tr.querySelector('[data-detail="producerNo"]').value,
+        producerNo: normalizeProducerNoForSave(tr.querySelector('[data-detail="producerNo"]').value),
         standard: tr.querySelector('[data-detail="standard"]').value,
         weight: tr.querySelector('[data-detail="weight"]').value,
         price: tr.querySelector('[data-detail="price"]').value,
@@ -2160,7 +2171,8 @@
     function mapProducer(row) {
       return {
         producerNo: row.producer_no,
-        producerName: row.producer_name || ''
+        producerName: row.producer_name || '',
+        producerSource: row.producer_source || row.source_column || ''
       };
     }
 
@@ -2252,26 +2264,172 @@
     }
     function activeCoolers() { return state.data ? state.data.master.coolers.filter(c => c.active) : []; }
     function activeStandards() { return state.data ? state.data.master.standards.filter(s => s.active) : []; }
-    function activeProducers() { return state.data && state.data.master.producers ? state.data.master.producers : []; }
+    function activeProducers() {
+      const producers = state.data && state.data.master.producers ? state.data.master.producers : [];
+      return producers
+        .map(enrichProducer)
+        .filter(p => p.producerBaseNumber >= 1 && p.producerBaseNumber <= 999)
+        .sort(compareProducer);
+    }
     function sortedPallets() { return state.data ? [...state.data.pallets].sort((a, b) => a.palletNo.localeCompare(b.palletNo)) : []; }
     function findPallet(palletNo) { return state.data && state.data.pallets.find(p => p.palletNo === String(palletNo || '').trim()); }
-    function findProducer(producerNo) {
+    function findProducer(producerNo, sourceHint = '') {
       const target = cleanText(producerNo);
-      const normalized = normalizeProducerNo(target);
-      return activeProducers().find(p => {
-        const current = cleanText(p.producerNo);
-        return current === target || normalizeProducerNo(current) === normalized;
-      }) || null;
+      if (!target) return null;
+      const info = parseProducerNo(target, sourceHint);
+      const producers = activeProducers();
+      const exact = producers.find(p => cleanText(p.producerNo) === target && (!info.source || p.producerSource === info.source))
+        || producers.find(p => cleanText(p.producerNo) === target);
+      if (exact) return exact;
+      const sameSource = producers.find(p => p.producerSource === info.source && p.producerBaseNumber === info.baseNumber);
+      if (sameSource) return sameSource;
+      return producers.find(p => p.producerBaseNumber === info.baseNumber) || null;
     }
-    function normalizeProducerNo(value) {
+
+    function enrichProducer(producer) {
+      const info = parseProducerNo(producer.producerNo, producer.producerSource);
+      return {
+        ...producer,
+        producerSource: info.source || 'A',
+        producerBaseNo: info.baseNo,
+        producerBaseNumber: info.baseNumber,
+        producerDisplayNo: info.displayNo
+      };
+    }
+
+    function compareProducer(a, b) {
+      return a.producerBaseNumber - b.producerBaseNumber
+        || producerSourceOrder(a.producerSource) - producerSourceOrder(b.producerSource)
+        || cleanText(a.producerName).localeCompare(cleanText(b.producerName), 'ja')
+        || cleanText(a.producerNo).localeCompare(cleanText(b.producerNo), 'ja');
+    }
+
+    function producerSourceOrder(source) {
+      return source === 'D' ? 2 : 1;
+    }
+
+    function parseProducerNo(value, sourceHint = '') {
+      const raw = cleanText(value);
+      const sourceFromHint = normalizeProducerSource(sourceHint);
+      const digits = raw.replace(/[^\d]/g, '');
+      if (!digits) {
+        return { raw, source: sourceFromHint || 'A', baseNo: '', baseNumber: 0, displayNo: '' };
+      }
+      let source = sourceFromHint;
+      if (!source) {
+        if (digits.length >= 7) source = 'D';
+        else source = 'A';
+      }
+      const baseDigits = source === 'D'
+        ? digits.slice(-2)
+        : (digits.length >= 4 ? digits.slice(-3) : digits);
+      const baseNumber = Number(baseDigits);
+      if (!Number.isFinite(baseNumber) || baseNumber <= 0) {
+        return { raw, source, baseNo: '', baseNumber: 0, displayNo: '' };
+      }
+      return {
+        raw,
+        source,
+        baseNo: source === 'D' ? padNumber(baseNumber, 2) : String(baseNumber),
+        baseNumber,
+        displayNo: padNumber(baseNumber, 3)
+      };
+    }
+
+    function normalizeProducerSource(value) {
+      const text = cleanText(value).toUpperCase();
+      if (text === 'D' || text === 'Ｄ' || text === 'D列') return 'D';
+      if (text === 'A' || text === 'Ａ' || text === 'A列') return 'A';
+      return '';
+    }
+
+    function producerChoiceDisplay(producer) {
+      const p = enrichProducer(producer);
+      return `${p.producerName || '(名称なし)'} / ${p.producerDisplayNo}`;
+    }
+
+    function producerOptionCode(producer) {
+      const p = enrichProducer(producer);
+      return `${p.producerSource}列 ${p.producerDisplayNo} → ${buildStoredProducerNo(p)}`;
+    }
+
+    function producerSearchText(producer) {
+      const p = enrichProducer(producer);
+      return [
+        p.producerName,
+        p.producerNo,
+        p.producerDisplayNo,
+        p.producerBaseNo,
+        p.producerSource,
+        buildStoredProducerNo(p)
+      ].filter(Boolean).join(' ');
+    }
+
+    function normalizeProducerNoForSave(value) {
       const text = cleanText(value);
-      return /^\d+$/.test(text) ? String(Number(text)) : text;
+      if (!text) return '';
+      if (isStoredProducerNo(text)) return text.replace(/[^\d]/g, '');
+      const producer = findProducer(text);
+      if (producer) return buildStoredProducerNo(producer);
+      const info = parseProducerNo(text, 'A');
+      return info.baseNumber ? buildStoredProducerNo(info) : text;
+    }
+
+    function isStoredProducerNo(value) {
+      const digits = cleanText(value).replace(/[^\d]/g, '');
+      return /^\d{4,5}$/.test(digits) || /^\d{7,8}$/.test(digits);
+    }
+
+    function buildStoredProducerNo(producer) {
+      const p = producer.producerBaseNumber
+        ? producer
+        : (producer.baseNumber
+          ? {
+            producerSource: producer.source || 'A',
+            producerBaseNumber: producer.baseNumber,
+            producerNo: producer.raw || producer.baseNo || ''
+          }
+          : enrichProducer(producer));
+      if (!p.producerBaseNumber) return cleanText(producer.producerNo || producer.raw || '');
+      if (p.producerSource === 'D') {
+        const date = producerCodeDate();
+        return `${reiwaYearFromYear(date.getFullYear())}${padNumber(date.getMonth() + 1, 2)}${padNumber(date.getDate(), 2)}${padNumber(p.producerBaseNumber, 2)}`;
+      }
+      return `${reiwaYearFromYear(registerYear())}${padNumber(p.producerBaseNumber, 3)}`;
+    }
+
+    function registerYear() {
+      const year = Number(($('regYear') && $('regYear').value) || new Date().getFullYear());
+      return Number.isFinite(year) && year > 0 ? year : new Date().getFullYear();
+    }
+
+    function producerCodeDate() {
+      const now = new Date();
+      return new Date(registerYear(), now.getMonth(), now.getDate());
+    }
+
+    function reiwaYearFromYear(year) {
+      const reiwa = Number(year) - 2018;
+      return reiwa > 0 ? String(reiwa) : String(year);
+    }
+
+    function padNumber(value, length) {
+      return String(Number(value || 0)).padStart(length, '0');
+    }
+
+    function resolveProducerForDetail(detail) {
+      const source = parseProducerNo(detail.producerNo).source;
+      return findProducer(detail.producerNo, source);
+    }
+
+    function resolveProducerName(detail) {
+      const producer = resolveProducerForDetail(detail);
+      return detail.producerName || (producer && producer.producerName) || '';
     }
     function qrProducerLabel(detail) {
-      const producer = detail.producerName ? null : findProducer(detail.producerNo);
-      return [detail.producerNo, detail.producerName || (producer && producer.producerName)].filter(Boolean).join(' ');
+      return [detail.producerNo, resolveProducerName(detail)].filter(Boolean).join(' ');
     }
-    function producerLabel(detail) { return [detail.producerNo, detail.producerName].filter(Boolean).join(' '); }
+    function producerLabel(detail) { return [detail.producerNo, resolveProducerName(detail)].filter(Boolean).join(' '); }
     function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
     function cleanText(value) { return String(value || '').trim(); }
     function selectedCooler(selectId) { const id = $(selectId).value; return activeCoolers().find(c => c.coolerId === id) || activeCoolers()[0] || null; }

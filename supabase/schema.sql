@@ -60,11 +60,13 @@ create table if not exists public.locations (
 );
 
 create table if not exists public.producers (
-  producer_no text primary key,
+  producer_source text not null default 'A' check (producer_source in ('A', 'D')),
+  producer_no text not null,
   producer_name text not null,
   source_updated_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (producer_source, producer_no)
 );
 
 create table if not exists public.pallets (
@@ -141,7 +143,19 @@ select
   d.price,
   d.memo
 from public.pallet_details d
-left join public.producers p on p.producer_no = d.producer_no;
+left join public.producers p on (
+  case
+    when length(regexp_replace(d.producer_no, '\D', '', 'g')) >= 7 then
+      p.producer_source = 'D'
+      and lpad(regexp_replace(p.producer_no, '\D', '', 'g'), 2, '0') = right(regexp_replace(d.producer_no, '\D', '', 'g'), 2)
+    when length(regexp_replace(d.producer_no, '\D', '', 'g')) >= 4 then
+      p.producer_source = 'A'
+      and lpad(regexp_replace(p.producer_no, '\D', '', 'g'), 3, '0') = right(regexp_replace(d.producer_no, '\D', '', 'g'), 3)
+    else
+      p.producer_source = 'A'
+      and regexp_replace(p.producer_no, '\D', '', 'g') = regexp_replace(d.producer_no, '\D', '', 'g')
+  end
+);
 
 drop trigger if exists workers_set_updated_at on public.workers;
 create trigger workers_set_updated_at before update on public.workers
