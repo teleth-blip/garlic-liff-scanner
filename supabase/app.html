@@ -2799,8 +2799,8 @@
     }
 
     function compareProducer(a, b) {
-      return a.producerBaseNumber - b.producerBaseNumber
-        || producerSourceOrder(a.producerSource) - producerSourceOrder(b.producerSource)
+      return producerSourceOrder(a.producerSource) - producerSourceOrder(b.producerSource)
+        || cleanText(a.producerBaseNo).localeCompare(cleanText(b.producerBaseNo), 'ja')
         || cleanText(a.producerName).localeCompare(cleanText(b.producerName), 'ja')
         || cleanText(a.producerNo).localeCompare(cleanText(b.producerNo), 'ja');
     }
@@ -2831,11 +2831,15 @@
       return {
         raw,
         source,
-        baseNo: source === 'D' ? padNumber(baseNumber, 2) : String(baseNumber),
+        baseNo: formatProducerBaseNo(source, baseNumber),
         baseNumber,
         digits,
-        displayNo: padNumber(baseNumber, 3)
+        displayNo: formatProducerBaseNo(source, baseNumber)
       };
+    }
+
+    function formatProducerBaseNo(source, baseNumber) {
+      return padNumber(baseNumber, source === 'D' ? 2 : 3);
     }
 
     function parseProducerInputCode(value) {
