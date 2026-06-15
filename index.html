@@ -243,6 +243,29 @@
       gap: 6px;
       overflow-x: auto;
       padding-bottom: 4px;
+      align-items: stretch;
+    }
+    .grid-axis-corner,
+    .grid-col-label,
+    .grid-row-label {
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #eef4f0;
+      color: #344139;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .grid-axis-corner {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .grid-row-label {
+      min-height: 56px;
     }
     .cell {
       min-width: 78px;
@@ -435,6 +458,46 @@
       grid-template-columns: repeat(2, minmax(180px, 1fr));
       gap: 10px;
       align-items: end;
+    }
+    .pallet-pick-field {
+      position: relative;
+    }
+    .pallet-suggestions {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      max-height: 240px;
+      overflow: auto;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .12);
+    }
+    .pallet-suggestions.hidden {
+      display: none;
+    }
+    .pallet-option {
+      width: 100%;
+      min-height: 44px;
+      padding: 8px 10px;
+      border: 1px solid #d7ded9;
+      border-radius: 8px;
+      background: #f8fbf9;
+      color: var(--ink);
+      text-align: left;
+      font-weight: 700;
+    }
+    .pallet-option .pallet-option-main {
+      display: block;
+      line-height: 1.25;
+    }
+    .pallet-option .pallet-option-sub {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
     }
     .label-sheet {
       display: grid;
@@ -631,14 +694,15 @@
         <span class="muted">A-one 72206 / A4横 / 2列3行</span>
       </div>
       <div class="qr-pick-grid">
-        <label>左列パレット番号
-          <input id="qrLeftNo" list="qrPalletOptions" autocomplete="off">
+        <label class="pallet-pick-field">左列パレット番号
+          <input id="qrLeftNo" autocomplete="off">
+          <div class="pallet-suggestions hidden" data-pallet-suggestions></div>
         </label>
-        <label>右列パレット番号
-          <input id="qrRightNo" list="qrPalletOptions" autocomplete="off">
+        <label class="pallet-pick-field">右列パレット番号
+          <input id="qrRightNo" autocomplete="off">
+          <div class="pallet-suggestions hidden" data-pallet-suggestions></div>
         </label>
       </div>
-      <datalist id="qrPalletOptions"></datalist>
       <div class="action-row">
         <button type="button" id="clearQrBtn" class="secondary">入力クリア</button>
         <button type="button" id="printBtn">印刷</button>
@@ -914,6 +978,7 @@
       document.querySelectorAll('[data-scan-target]').forEach(btn => btn.addEventListener('click', () => startScanner(btn.dataset.scanTarget)));
       document.addEventListener('click', event => {
         if (!event.target.closest('.producer-cell')) closeProducerSuggestions();
+        if (!event.target.closest('.pallet-pick-field')) closePalletSuggestions();
       });
       $('reloadBtn').addEventListener('click', refreshAll);
       $('workerSelect').addEventListener('change', () => {
@@ -923,8 +988,20 @@
       $('clearRegisterBtn').addEventListener('click', clearRegisterForm);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
       $('savePalletBtn').addEventListener('click', () => withBusy('savePalletBtn', '保存中...', savePallet));
-      $('qrLeftNo').addEventListener('input', () => { state.qrPrint.left = $('qrLeftNo').value.trim(); renderPrintArea(); });
-      $('qrRightNo').addEventListener('input', () => { state.qrPrint.right = $('qrRightNo').value.trim(); renderPrintArea(); });
+      ['focus', 'click', 'pointerdown'].forEach(type => {
+        $('qrLeftNo').addEventListener(type, () => renderPalletSuggestions('qrLeftNo', 'left'));
+        $('qrRightNo').addEventListener(type, () => renderPalletSuggestions('qrRightNo', 'right'));
+      });
+      $('qrLeftNo').addEventListener('input', () => {
+        state.qrPrint.left = $('qrLeftNo').value.trim();
+        renderPrintArea();
+        renderPalletSuggestions('qrLeftNo', 'left');
+      });
+      $('qrRightNo').addEventListener('input', () => {
+        state.qrPrint.right = $('qrRightNo').value.trim();
+        renderPrintArea();
+        renderPalletSuggestions('qrRightNo', 'right');
+      });
       $('clearQrBtn').addEventListener('click', () => {
         state.qrPrint.left = '';
         state.qrPrint.right = '';
@@ -1347,9 +1424,55 @@
     }
 
     function renderQrChoices() {
-      $('qrPalletOptions').innerHTML = sortedPallets()
-        .map(p => `<option value="${esc(p.palletNo)}">${esc(p.status)} / ${num(p.weight)}kg</option>`)
-        .join('');
+      closePalletSuggestions();
+    }
+
+    function renderPalletSuggestions(inputId, side) {
+      closePalletSuggestions(inputId);
+      const input = $(inputId);
+      const box = input.closest('.pallet-pick-field').querySelector('[data-pallet-suggestions]');
+      const query = cleanText(input.value).toLowerCase();
+      const pallets = sortedPallets()
+        .filter(p => {
+          if (!query) return true;
+          return `${p.palletNo} ${p.status} ${p.currentLocationName || ''}`.toLowerCase().includes(query);
+        })
+        .slice(0, 80);
+      if (!pallets.length) {
+        box.innerHTML = '<div class="producer-no-match">該当なし</div>';
+      } else {
+        box.innerHTML = pallets.map(p => `
+          <button type="button" class="pallet-option" data-pallet-pick="${esc(p.palletNo)}">
+            <span class="pallet-option-main">${esc(p.palletNo)}</span>
+            <span class="pallet-option-sub">${esc(p.status)} / ${num(p.weight)}kg${p.currentLocationName ? ` / ${esc(p.currentLocationName)}` : ''}</span>
+          </button>
+        `).join('');
+      }
+      box.classList.remove('hidden');
+      box.querySelectorAll('[data-pallet-pick]').forEach(btn => {
+        btn.addEventListener('pointerdown', event => {
+          event.preventDefault();
+          selectQrPallet(inputId, side, btn.dataset.palletPick);
+        });
+        btn.addEventListener('click', event => {
+          event.preventDefault();
+          selectQrPallet(inputId, side, btn.dataset.palletPick);
+        });
+      });
+    }
+
+    function selectQrPallet(inputId, side, palletNo) {
+      $(inputId).value = palletNo;
+      state.qrPrint[side] = palletNo;
+      renderPrintArea();
+      closePalletSuggestions();
+    }
+
+    function closePalletSuggestions(exceptInputId = '') {
+      document.querySelectorAll('[data-pallet-suggestions]').forEach(box => {
+        if (exceptInputId && $(exceptInputId).closest('.pallet-pick-field').contains(box)) return;
+        box.classList.add('hidden');
+      });
     }
 
     function renderPrintArea() {
@@ -1416,6 +1539,23 @@
       renderRemovalGrid('moveStartGrid', selectedCooler('moveStartCooler'), Number($('moveStartLevel').value || 1), 'moveStart');
     }
 
+    function setGridWithCoordinates(container, cooler, cells) {
+      const colCount = Number(cooler.colCount || 0);
+      const rowCount = Number(cooler.rowCount || 0);
+      container.style.gridTemplateColumns = `42px repeat(${colCount}, minmax(78px, 1fr))`;
+      const html = ['<div class="grid-axis-corner">行/列</div>'];
+      for (let col = 1; col <= colCount; col++) {
+        html.push(`<div class="grid-col-label">${col}</div>`);
+      }
+      for (let row = 1; row <= rowCount; row++) {
+        html.push(`<div class="grid-row-label">${row}</div>`);
+        for (let col = 1; col <= colCount; col++) {
+          html.push(cells[(row - 1) * colCount + col - 1] || '');
+        }
+      }
+      container.innerHTML = html.join('');
+    }
+
     function renderSelectableGrid(containerId, cooler, level, kind) {
       const container = $(containerId);
       if (!cooler) {
@@ -1424,8 +1564,7 @@
       }
       const placement = placementByLocation();
       const locations = locationMatrix(cooler, level);
-      container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
-      container.innerHTML = locations.map(loc => {
+      const cells = locations.map(loc => {
         const placed = placement[loc.locationId];
         const selected = state.selectedLocations[kind] === loc.locationId;
         const support = stackSupport(loc, placement);
@@ -1434,7 +1573,8 @@
         const label = !loc.available ? '使用不可' : placed ? placed.palletNo : '空き';
         const sub = placed ? '使用済み' : !loc.available ? (loc.note || '') : support.message;
         return `<button type="button" class="cell ${cls}" data-location="${esc(loc.locationId)}" ${canSelect ? '' : 'disabled'}>${esc(label)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</button>`;
-      }).join('');
+      });
+      setGridWithCoordinates(container, cooler, cells);
       container.querySelectorAll('[data-location]').forEach(btn => btn.addEventListener('click', () => {
         state.selectedLocations[kind] = btn.dataset.location;
         kind === 'inbound' ? renderInboundGrid() : renderMoveGrid();
@@ -1451,8 +1591,7 @@
       const locations = locationMatrix(cooler, level);
       const inputId = kind === 'outbound' ? 'outPalletNo' : 'moveStartPalletNo';
       const currentPalletNo = $(inputId).value.trim();
-      container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
-      container.innerHTML = locations.map(loc => {
+      const cells = locations.map(loc => {
         const placed = placement[loc.locationId];
         const selected = state.selectedLocations[kind] === loc.locationId || (placed && placed.palletNo === currentPalletNo);
         const upper = upperClear(loc, placement, cooler);
@@ -1461,7 +1600,8 @@
         const label = !loc.available ? '使用不可' : placed ? placed.palletNo : '空き';
         const sub = !loc.available ? (loc.note || '') : placed ? (upper.message || '出庫可能') : '';
         return `<button type="button" class="cell ${cls}" data-remove-location="${esc(loc.locationId)}" data-remove-pallet="${esc(placed ? placed.palletNo : '')}" ${canSelect ? '' : 'disabled'}>${esc(label)}${sub ? `<span class="sub">${esc(sub)}</span>` : ''}</button>`;
-      }).join('');
+      });
+      setGridWithCoordinates(container, cooler, cells);
       container.querySelectorAll('[data-remove-location]').forEach(btn => btn.addEventListener('click', () => {
         state.selectedLocations[kind] = btn.dataset.removeLocation;
         $(inputId).value = btn.dataset.removePallet || '';
@@ -1530,14 +1670,14 @@
       }
       const placement = placementByLocation();
       const locations = locationMatrix(cooler, level);
-      container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
-      container.innerHTML = locations.map(loc => {
+      const cells = locations.map(loc => {
         const placed = placement[loc.locationId];
         const selected = placed && placed.palletNo === state.inventorySelectedPalletNo;
         const cls = !loc.available ? 'unavailable' : placed ? (selected ? 'selected' : 'used') : 'available';
         const label = placed ? placed.palletNo : loc.available ? '空き' : '使用不可';
         return `<button type="button" class="cell ${cls}" data-check-pallet="${esc(placed ? placed.palletNo : '')}" ${placed ? '' : 'disabled'}>${esc(label)}<span class="sub">${esc(loc.displayName || loc.locationId)}</span></button>`;
-      }).join('');
+      });
+      setGridWithCoordinates(container, cooler, cells);
       container.querySelectorAll('[data-check-pallet]').forEach(btn => btn.addEventListener('click', () => {
         state.inventorySelectedPalletNo = btn.dataset.checkPallet || '';
         renderCheckGrid();
@@ -1754,7 +1894,6 @@
       const key = `${cooler.coolerId}:${level}`;
       if (state.masterDraftKey !== key) loadMasterDraft();
       const placement = placementByLocation();
-      container.style.gridTemplateColumns = `repeat(${cooler.colCount}, minmax(78px, 1fr))`;
       const cells = [];
       for (let row = 1; row <= Number(cooler.rowCount); row++) {
         for (let col = 1; col <= Number(cooler.colCount); col++) {
@@ -1766,7 +1905,7 @@
           cells.push(`<button type="button" class="cell ${cls}" data-master-cell="${row}-${col}" ${placed ? 'disabled' : ''}>${esc(label)}<span class="sub">R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}</span></button>`);
         }
       }
-      container.innerHTML = cells.join('');
+      setGridWithCoordinates(container, cooler, cells);
       container.querySelectorAll('[data-master-cell]').forEach(btn => btn.addEventListener('click', () => {
         const key = btn.dataset.masterCell;
         if (state.masterUnavailable.has(key)) state.masterUnavailable.delete(key);
