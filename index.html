@@ -206,6 +206,9 @@
     .muted { color: var(--muted); }
     .table-wrap {
       overflow: auto;
+      max-height: min(62vh, 520px);
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
@@ -316,8 +319,12 @@
       gap: 4px;
       width: 100%;
       min-width: 260px;
-      max-height: 240px;
-      overflow: auto;
+      max-height: min(52vh, 360px);
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
       padding: 6px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -377,6 +384,11 @@
       display: grid;
       gap: 8px;
       margin: 10px 0;
+      max-height: min(52vh, 420px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
     }
     .moving-item {
       display: grid;
@@ -466,8 +478,12 @@
       display: grid;
       gap: 4px;
       width: 100%;
-      max-height: 240px;
-      overflow: auto;
+      max-height: min(52vh, 360px);
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
       padding: 6px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -1505,7 +1521,7 @@
 
     function detailMiniTable(details) {
       return `<table class="detail-mini"><thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th></tr></thead><tbody>${
-        details.map(d => `<tr><td>${esc(producerLabel(d))}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td></tr>`).join('')
+        details.map(d => `<tr><td>${esc(qrProducerLabel(d))}</td><td>${esc(d.standard)}</td><td>${num(d.weight)}</td><td>${num(d.price)}</td></tr>`).join('')
       }</tbody></table>`;
     }
 
@@ -2425,7 +2441,22 @@
     function activeProducers() { return state.data && state.data.master.producers ? state.data.master.producers : []; }
     function sortedPallets() { return state.data ? [...state.data.pallets].sort((a, b) => a.palletNo.localeCompare(b.palletNo)) : []; }
     function findPallet(palletNo) { return state.data && state.data.pallets.find(p => p.palletNo === String(palletNo || '').trim()); }
-    function findProducer(producerNo) { return activeProducers().find(p => p.producerNo === String(producerNo || '').trim()) || null; }
+    function findProducer(producerNo) {
+      const target = cleanText(producerNo);
+      const normalized = normalizeProducerNo(target);
+      return activeProducers().find(p => {
+        const current = cleanText(p.producerNo);
+        return current === target || normalizeProducerNo(current) === normalized;
+      }) || null;
+    }
+    function normalizeProducerNo(value) {
+      const text = cleanText(value);
+      return /^\d+$/.test(text) ? String(Number(text)) : text;
+    }
+    function qrProducerLabel(detail) {
+      const producer = detail.producerName ? null : findProducer(detail.producerNo);
+      return [detail.producerNo, detail.producerName || (producer && producer.producerName)].filter(Boolean).join(' ');
+    }
     function producerLabel(detail) { return [detail.producerNo, detail.producerName].filter(Boolean).join(' '); }
     function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
     function cleanText(value) { return String(value || '').trim(); }
