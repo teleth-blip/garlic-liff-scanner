@@ -2283,10 +2283,7 @@
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error('このブラウザではカメラを直接起動できません。');
         }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false
-        });
+        const stream = await getCameraStream();
         const video = $('scannerVideo');
         video.srcObject = stream;
         await video.play();
@@ -2298,8 +2295,51 @@
         state.scanner = { targetId, stream, detector, active: true, canvas: document.createElement('canvas'), raf: 0 };
         scanLoop();
       } catch (error) {
-        showToast(error.message || 'カメラを起動できませんでした。', true);
+        focusManualInput(targetId);
+        showToast(cameraErrorMessage(error), true);
       }
+    }
+
+    async function getCameraStream() {
+      const attempts = [
+        { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        { video: true, audio: false }
+      ];
+      let lastError = null;
+      for (const constraints of attempts) {
+        try {
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (error) {
+          lastError = error;
+          if (isPermissionDeniedError(error)) throw error;
+        }
+      }
+      throw lastError || new Error('カメラを起動できませんでした。');
+    }
+
+    function isPermissionDeniedError(error) {
+      const name = error && error.name ? String(error.name) : '';
+      const message = error && error.message ? String(error.message) : '';
+      return /NotAllowedError|SecurityError/i.test(name) || /permission denied|permission dismissed|denied|許可/i.test(message);
+    }
+
+    function cameraErrorMessage(error) {
+      if (isPermissionDeniedError(error)) {
+        return 'カメラ権限が拒否されています。LINEの場合は端末設定でLINEのカメラを許可し、画面を閉じて開き直してください。直らない場合はLINE右上メニューから外部ブラウザで開いてください。';
+      }
+      const name = error && error.name ? String(error.name) : '';
+      const message = error && error.message ? String(error.message) : '';
+      if (/NotFoundError|DevicesNotFoundError/i.test(name)) return 'カメラが見つかりません。端末のカメラ設定を確認し、手入力してください。';
+      if (/NotReadableError|TrackStartError/i.test(name)) return 'カメラを他のアプリが使用中の可能性があります。他のカメラアプリを閉じてから再試行してください。';
+      return message || 'カメラを起動できませんでした。手入力してください。';
+    }
+
+    function focusManualInput(targetId) {
+      const input = $(targetId);
+      if (!input) return;
+      input.focus();
+      input.select && input.select();
     }
 
     async function scanLoop() {
@@ -2367,7 +2407,7 @@
       toast.classList.toggle('error', !!isError);
       toast.classList.remove('hidden');
       clearTimeout(showToast.timer);
-      showToast.timer = setTimeout(() => toast.classList.add('hidden'), isError ? 5200 : 2400);
+      showToast.timer = setTimeout(() => toast.classList.add('hidden'), isError ? 12000 : 2400);
     }
 
     function activeWorkers() {
