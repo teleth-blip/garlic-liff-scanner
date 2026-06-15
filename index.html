@@ -42,22 +42,120 @@
       border-bottom: 1px solid var(--line);
     }
     .header-row {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
       max-width: none;
       margin: 0 auto;
+      min-width: 0;
     }
     h1 {
+      flex: 0 0 auto;
       margin: 0;
-      font-size: 21px;
+      font-size: 16px;
       letter-spacing: 0;
+      line-height: 1.2;
+      white-space: nowrap;
     }
     .worker-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1 1 auto;
+      justify-content: flex-end;
+      min-width: 0;
+      margin-left: auto;
+    }
+    .worker-select-label {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: auto minmax(96px, 1fr);
+      align-items: center;
+      gap: 5px;
+      flex: 1 1 auto;
+      max-width: 170px;
+      min-width: 0;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .worker-select-label select {
+      width: 100%;
+      min-height: 36px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .header-btn {
+      min-height: 36px;
+      padding: 7px 9px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    body.login-locked .app-header,
+    body.login-locked main {
+      display: none;
+    }
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: var(--bg);
+    }
+    .login-card {
+      width: min(100%, 420px);
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .12);
+    }
+    .login-card h2 {
+      margin-bottom: 14px;
+      font-size: 18px;
+    }
+    .login-card .login-actions {
+      display: grid;
       gap: 8px;
-      align-items: end;
+      margin-top: 12px;
+    }
+    .login-message {
+      min-height: 20px;
+      margin-top: 10px;
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    @media (max-width: 420px) {
+      .app-header {
+        padding: 6px;
+      }
+      .header-row {
+        gap: 5px;
+      }
+      h1 {
+        font-size: 14px;
+      }
+      .worker-bar {
+        gap: 4px;
+      }
+      .worker-select-label {
+        grid-template-columns: minmax(82px, 1fr);
+        max-width: 118px;
+      }
+      .worker-select-label span {
+        display: none;
+      }
+      .worker-select-label select {
+        min-height: 34px;
+        padding: 5px 6px;
+        font-size: 12px;
+      }
+      .header-btn {
+        min-height: 34px;
+        padding: 5px 6px;
+        font-size: 11px;
+      }
     }
     main {
       width: 100%;
@@ -590,15 +688,32 @@
     }
   </style>
 </head>
-<body>
+<body class="login-locked">
+  <div id="loginScreen" class="login-screen">
+    <form id="loginForm" class="login-card">
+      <h2>ログイン</h2>
+      <label>作業者
+        <select id="loginWorkerSelect"></select>
+      </label>
+      <label>PIN
+        <input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="未設定の場合は空欄">
+      </label>
+      <div class="login-actions">
+        <button type="submit" id="loginBtn">ログイン</button>
+      </div>
+      <div id="loginMessage" class="login-message"></div>
+    </form>
+  </div>
+
   <header class="app-header">
     <div class="header-row">
       <h1>にんにく冷蔵庫管理</h1>
       <div class="worker-bar">
-        <label>作業者
+        <label class="worker-select-label"><span>作業者</span>
           <select id="workerSelect"></select>
         </label>
-        <button type="button" id="reloadBtn" class="secondary">更新</button>
+        <button type="button" id="reloadBtn" class="secondary header-btn">更新</button>
+        <button type="button" id="logoutBtn" class="secondary header-btn">ログアウト</button>
       </div>
     </div>
   </header>
@@ -905,6 +1020,7 @@
       data: null,
       workers: [],
       workerId: localStorage.getItem('garlic.workerId') || '',
+      loggedIn: false,
       tab: 'register',
       editPalletNo: '',
       selectedLocations: { inbound: '', outbound: '', moveStart: '', move: '' },
@@ -937,8 +1053,12 @@
         $('launchPanel').classList.remove('hidden');
         $('launchPalletNo').textContent = state.launch.palletNo;
       }
-      await refreshAll();
-      if (state.launch.palletNo && state.launch.mode) applyLaunchAction(state.launch.mode);
+      await refreshWorkersOnly({ forLogin: true });
+      if (restoreLogin()) {
+        await unlockApp();
+      } else {
+        showLoginScreen();
+      }
     }
 
     function bindEvents() {
@@ -949,9 +1069,15 @@
         if (!event.target.closest('.pallet-pick-field')) closePalletSuggestions();
       });
       $('reloadBtn').addEventListener('click', refreshAll);
+      $('logoutBtn').addEventListener('click', logout);
+      $('loginForm').addEventListener('submit', event => {
+        event.preventDefault();
+        login();
+      });
       $('workerSelect').addEventListener('change', () => {
         state.workerId = $('workerSelect').value;
         localStorage.setItem('garlic.workerId', state.workerId);
+        saveLoginState(state.workerId);
       });
       $('clearRegisterBtn').addEventListener('click', clearRegisterForm);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
@@ -1123,11 +1249,86 @@
       $('regYear').value = String(new Date().getFullYear());
     }
 
+    function showLoginScreen(message = '') {
+      state.loggedIn = false;
+      document.body.classList.add('login-locked');
+      $('loginScreen').classList.remove('hidden');
+      $('loginMessage').textContent = message;
+      renderLoginWorkers();
+    }
+
+    async function unlockApp() {
+      state.loggedIn = true;
+      document.body.classList.remove('login-locked');
+      $('loginScreen').classList.add('hidden');
+      ensureWorkerSelection();
+      renderWorkers();
+      await refreshAll();
+      if (state.launch.palletNo && state.launch.mode) applyLaunchAction(state.launch.mode);
+    }
+
+    async function login() {
+      const workerId = $('loginWorkerSelect').value;
+      const worker = activeWorkers().find(w => w.workerId === workerId);
+      if (!worker) {
+        showLoginScreen('作業者を選択してください。');
+        return;
+      }
+      const configuredPin = workerPin(worker);
+      const inputPin = cleanText($('loginPin').value);
+      if (configuredPin && inputPin !== configuredPin) {
+        $('loginMessage').textContent = 'PINが違います。';
+        return;
+      }
+      state.workerId = worker.workerId;
+      saveLoginState(worker.workerId);
+      $('loginPin').value = '';
+      await unlockApp();
+    }
+
+    function logout() {
+      localStorage.removeItem('garlic.login.v1');
+      localStorage.removeItem('garlic.workerId');
+      state.workerId = '';
+      state.data = null;
+      showLoginScreen('ログアウトしました。');
+    }
+
+    function restoreLogin() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('garlic.login.v1') || '{}');
+        if (!saved || !saved.workerId) return false;
+        const worker = activeWorkers().find(w => w.workerId === saved.workerId);
+        if (!worker) return false;
+        state.workerId = worker.workerId;
+        localStorage.setItem('garlic.workerId', state.workerId);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function saveLoginState(workerId) {
+      const worker = activeWorkers().find(w => w.workerId === workerId);
+      if (!worker) return;
+      localStorage.setItem('garlic.workerId', worker.workerId);
+      localStorage.setItem('garlic.login.v1', JSON.stringify({
+        workerId: worker.workerId,
+        workerName: worker.workerName,
+        loggedInAt: new Date().toISOString()
+      }));
+    }
+
+    function workerPin(worker) {
+      const note = cleanText(worker && worker.note);
+      const match = note.match(/(?:PIN|pin|ＰＩＮ|暗証番号)\s*[:：=]\s*([0-9A-Za-z_-]+)/);
+      return match ? match[1] : '';
+    }
+
     function ensureWorkerSelection() {
       const workers = activeWorkers();
       if (!state.workerId || !workers.some(w => w.workerId === state.workerId)) {
         state.workerId = workers[0] ? workers[0].workerId : '';
-        if (state.workerId) localStorage.setItem('garlic.workerId', state.workerId);
       }
     }
 
@@ -1136,11 +1337,18 @@
       $('workerSelect').value = state.workerId;
     }
 
-    async function refreshWorkersOnly() {
+    function renderLoginWorkers() {
+      const workers = activeWorkers();
+      $('loginWorkerSelect').innerHTML = workers.map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}（${esc(w.workerId)}）</option>`).join('');
+      if (state.workerId && workers.some(w => w.workerId === state.workerId)) $('loginWorkerSelect').value = state.workerId;
+    }
+
+    async function refreshWorkersOnly(options = {}) {
       const res = await api('getWorkers');
       state.workers = res && res.master && Array.isArray(res.master.workers) ? res.master.workers : [];
-      ensureWorkerSelection();
-      renderWorkers();
+      if (!options.forLogin) ensureWorkerSelection();
+      renderLoginWorkers();
+      if (!options.forLogin) renderWorkers();
     }
 
     function renderSelectors() {
@@ -1990,6 +2198,9 @@
     }
 
     async function api(method, payload = {}) {
+      if (!state.loggedIn && !['getWorkers', 'ping'].includes(method)) {
+        throw new Error('ログインしてください。');
+      }
       switch (method) {
         case 'ping':
           return supabaseRpc('ping_write_api');
