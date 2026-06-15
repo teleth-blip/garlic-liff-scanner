@@ -1211,8 +1211,8 @@
         renderProducerSuggestions(tr, event.target.value);
       });
       tr.querySelector('[data-detail="producerNo"]').addEventListener('input', event => {
-        const producer = findProducer(event.target.value);
-        if (producer) producerSearch.value = producerDisplayValue(producer.producerNo);
+        const producer = findProducerFromInputCode(event.target.value);
+        if (producer) producerSearch.value = producerChoiceDisplay(producer);
       });
       tr.querySelector('[data-detail="weight"]').addEventListener('input', updateRegisterWeight);
       tr.querySelector('button').addEventListener('click', () => {
@@ -1236,7 +1236,7 @@
     }
 
     function producerDisplayValue(producerNo) {
-      const producer = findProducer(producerNo);
+      const producer = findProducerFromInputCode(producerNo) || findProducer(producerNo);
       return producer ? producerChoiceDisplay(producer) : cleanText(producerNo);
     }
 
@@ -2278,12 +2278,15 @@
       if (!target) return null;
       const info = parseProducerNo(target, sourceHint);
       const producers = activeProducers();
-      const exact = producers.find(p => cleanText(p.producerNo) === target && (!info.source || p.producerSource === info.source))
-        || producers.find(p => cleanText(p.producerNo) === target);
+      const exact = producers.find(p => cleanText(p.producerNo) === target && p.producerSource === info.source);
       if (exact) return exact;
-      const sameSource = producers.find(p => p.producerSource === info.source && p.producerBaseNumber === info.baseNumber);
-      if (sameSource) return sameSource;
-      return producers.find(p => p.producerBaseNumber === info.baseNumber) || null;
+      return producers.find(p => p.producerSource === info.source && p.producerBaseNumber === info.baseNumber) || null;
+    }
+
+    function findProducerFromInputCode(value) {
+      const info = parseProducerInputCode(value);
+      if (!info.baseNumber) return null;
+      return activeProducers().find(p => p.producerSource === info.source && p.producerBaseNumber === info.baseNumber) || null;
     }
 
     function enrichProducer(producer) {
@@ -2336,6 +2339,17 @@
       };
     }
 
+    function parseProducerInputCode(value) {
+      const raw = cleanText(value);
+      const digits = raw.replace(/[^\d]/g, '');
+      if (!digits) return { raw, source: '', baseNo: '', baseNumber: 0, displayNo: '' };
+      if (digits.length === 7 || digits.length === 8) return parseProducerNo(raw, 'D');
+      if (digits.length === 4 || digits.length === 5) return parseProducerNo(raw, 'A');
+      if (digits.length === 3) return parseProducerNo(raw, 'A');
+      if (digits.length === 2) return parseProducerNo(raw, 'D');
+      return parseProducerNo(raw, 'A');
+    }
+
     function normalizeProducerSource(value) {
       const text = cleanText(value).toUpperCase();
       if (text === 'D' || text === 'Ｄ' || text === 'D列') return 'D';
@@ -2369,9 +2383,9 @@
       const text = cleanText(value);
       if (!text) return '';
       if (isStoredProducerNo(text)) return text.replace(/[^\d]/g, '');
-      const producer = findProducer(text);
+      const producer = findProducerFromInputCode(text) || findProducer(text);
       if (producer) return buildStoredProducerNo(producer);
-      const info = parseProducerNo(text, 'A');
+      const info = parseProducerInputCode(text);
       return info.baseNumber ? buildStoredProducerNo(info) : text;
     }
 
@@ -2395,17 +2409,11 @@
         const date = producerCodeDate();
         return `${reiwaYearFromYear(date.getFullYear())}${padNumber(date.getMonth() + 1, 2)}${padNumber(date.getDate(), 2)}${padNumber(p.producerBaseNumber, 2)}`;
       }
-      return `${reiwaYearFromYear(registerYear())}${padNumber(p.producerBaseNumber, 3)}`;
-    }
-
-    function registerYear() {
-      const year = Number(($('regYear') && $('regYear').value) || new Date().getFullYear());
-      return Number.isFinite(year) && year > 0 ? year : new Date().getFullYear();
+      return `${reiwaYearFromYear(producerCodeDate().getFullYear())}${padNumber(p.producerBaseNumber, 3)}`;
     }
 
     function producerCodeDate() {
-      const now = new Date();
-      return new Date(registerYear(), now.getMonth(), now.getDate());
+      return new Date();
     }
 
     function reiwaYearFromYear(year) {
