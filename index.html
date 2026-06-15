@@ -185,6 +185,26 @@
       background: var(--brand);
       border-color: var(--brand);
     }
+    .sub-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .sub-tab {
+      flex: 1 1 0;
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .sub-tab.active {
+      color: #fff;
+      background: var(--brand);
+      border-color: var(--brand);
+    }
     .panel {
       margin-bottom: 12px;
       padding: 12px;
@@ -913,69 +933,75 @@
     </section>
 
     <section id="movePanel" class="panel hidden" data-panel="move">
-      <h3>仮移動</h3>
-      <div class="operation-row">
-        <label>冷蔵庫
-          <select id="moveStartCooler"></select>
-        </label>
-        <label>段
-          <select id="moveStartLevel"></select>
-        </label>
-        <div class="pallet-lock-field">
-          <label>パレット番号
-            <input id="moveStartPalletNo" autocomplete="off">
+      <div class="sub-tabs">
+        <button type="button" class="sub-tab active" data-move-mode="start">仮移動</button>
+        <button type="button" class="sub-tab" data-move-mode="done">移動確定</button>
+      </div>
+      <div id="moveStartSection" data-move-section="start">
+        <div class="operation-row">
+          <label>冷蔵庫
+            <select id="moveStartCooler"></select>
           </label>
-          <button type="button" id="unlockMoveStartPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
+          <label>段
+            <select id="moveStartLevel"></select>
+          </label>
+          <div class="pallet-lock-field">
+            <label>パレット番号
+              <input id="moveStartPalletNo" autocomplete="off">
+            </label>
+            <button type="button" id="unlockMoveStartPalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
+          </div>
+        </div>
+        <div class="form-grid">
+          <label>備考
+            <input id="moveStartMemo">
+          </label>
+        </div>
+        <div id="moveStartSummary" class="pallet-summary hidden"></div>
+        <div id="moveStartGrid" class="location-grid"></div>
+        <div class="action-row">
+          <button type="button" id="moveStartBtn">仮移動</button>
         </div>
       </div>
-      <div class="form-grid">
-        <label>備考
-          <input id="moveStartMemo">
-        </label>
-      </div>
-      <div id="moveStartSummary" class="pallet-summary hidden"></div>
-      <div id="moveStartGrid" class="location-grid"></div>
-      <div class="action-row">
-        <button type="button" id="moveStartBtn">仮移動</button>
-      </div>
-      <h3>移動確定</h3>
-      <div class="operation-row">
-        <label>冷蔵庫
-          <select id="moveCooler"></select>
-        </label>
-        <label>段
-          <select id="moveLevel"></select>
-        </label>
-        <div class="pallet-lock-field">
-          <label>パレット番号
-            <input id="moveDonePalletNo" autocomplete="off">
+      <div id="moveDoneSection" data-move-section="done" class="hidden">
+        <div class="operation-row">
+          <label>冷蔵庫
+            <select id="moveCooler"></select>
           </label>
-          <button type="button" id="unlockMoveDonePalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
+          <label>段
+            <select id="moveLevel"></select>
+          </label>
+          <div class="pallet-lock-field">
+            <label>パレット番号
+              <input id="moveDonePalletNo" autocomplete="off">
+            </label>
+            <button type="button" id="unlockMoveDonePalletBtn" class="secondary unlock-pallet-btn hidden">固定解除</button>
+          </div>
         </div>
-      </div>
-      <div id="moveGrid" class="location-grid"></div>
-      <div id="movingList" class="moving-list"></div>
-      <div class="form-grid">
-        <label>備考
-          <input id="moveDoneMemo">
-        </label>
-      </div>
-      <div id="moveDoneSummary" class="pallet-summary hidden"></div>
-      <div class="action-row">
-        <button type="button" id="moveDoneBtn">移動確定</button>
+        <div id="moveGrid" class="location-grid"></div>
+        <div id="movingList" class="moving-list"></div>
+        <div class="form-grid">
+          <label>備考
+            <input id="moveDoneMemo">
+          </label>
+        </div>
+        <div id="moveDoneSummary" class="pallet-summary hidden"></div>
+        <div class="action-row">
+          <button type="button" id="moveDoneBtn">移動確定</button>
+        </div>
       </div>
     </section>
 
     <section id="inventoryPanel" class="panel hidden" data-panel="inventory">
       <div class="grid-controls">
+        <label>パレット検索
+          <input id="searchPallet" autocomplete="off">
+        </label>
         <label>冷蔵庫
           <select id="checkCooler"></select>
         </label>
         <label>段
           <select id="checkLevel"></select>
-        </label>
-        <label>パレット検索
-          <input id="searchPallet" autocomplete="off">
         </label>
       </div>
       <div id="checkGrid" class="location-grid"></div>
@@ -983,7 +1009,7 @@
       <h3>状態別一覧</h3>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>場所</th><th>登録日</th></tr></thead>
+          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>保管</th><th>登録日</th></tr></thead>
           <tbody id="inventoryRows"></tbody>
         </table>
       </div>
@@ -1067,6 +1093,7 @@
       workerId: localStorage.getItem('garlic.workerId') || '',
       loggedIn: false,
       tab: 'register',
+      moveMode: 'start',
       editPalletNo: '',
       selectedLocations: { inbound: '', outbound: '', moveStart: '', move: '' },
       lockedPallets: { inbound: '', outbound: '', moveStart: '', moveDone: '' },
@@ -1109,6 +1136,7 @@
 
     function bindEvents() {
       document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
+      document.querySelectorAll('[data-move-mode]').forEach(btn => btn.addEventListener('click', () => setMoveMode(btn.dataset.moveMode)));
       document.querySelectorAll('[data-launch-action]').forEach(btn => btn.addEventListener('click', () => applyLaunchAction(btn.dataset.launchAction)));
       document.addEventListener('click', event => {
         if (!event.target.closest('.producer-cell')) closeProducerSuggestions();
@@ -1172,7 +1200,7 @@
       $('moveDoneBtn').addEventListener('click', () => withBusy('moveDoneBtn', '確定中...', completeMove));
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
-      $('searchPallet').addEventListener('input', renderInventoryRows);
+      $('searchPallet').addEventListener('input', handleInventorySearch);
       $('addStandardBtn').addEventListener('click', addStandardRow);
       $('saveStandardsBtn').addEventListener('click', () => withBusy('saveStandardsBtn', '保存中...', saveStandards));
       $('addCoolerBtn').addEventListener('click', addCoolerRow);
@@ -1246,12 +1274,23 @@
       renderActionPallet('moveStart');
       renderActionPallet('moveDone');
       renderPalletLocks();
+      renderMoveMode();
     }
 
     function setTab(tab) {
       state.tab = tab;
       document.querySelectorAll('[data-tab]').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
       document.querySelectorAll('[data-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.panel !== tab));
+    }
+
+    function setMoveMode(mode) {
+      state.moveMode = mode === 'done' ? 'done' : 'start';
+      renderMoveMode();
+    }
+
+    function renderMoveMode() {
+      document.querySelectorAll('[data-move-mode]').forEach(btn => btn.classList.toggle('active', btn.dataset.moveMode === state.moveMode));
+      document.querySelectorAll('[data-move-section]').forEach(section => section.classList.toggle('hidden', section.dataset.moveSection !== state.moveMode));
     }
 
     function getLaunchParams() {
@@ -1293,9 +1332,11 @@
         const pallet = findPallet(palletNo);
         if (pallet && pallet.status === '仮移動中') {
           lockActionPallet('moveDone', palletNo);
+          setMoveMode('done');
         } else {
           lockActionPallet('moveStart', palletNo);
           focusStoredPalletLocation(palletNo, 'moveStartCooler', 'moveStartLevel', 'moveStart');
+          setMoveMode('start');
         }
         setTab('move');
         renderActionPallet('moveStart');
@@ -1359,7 +1400,9 @@
       $(coolerSelectId).value = location.coolerId;
       renderLevelOptions(levelSelectId, selectedCooler(coolerSelectId));
       $(levelSelectId).value = String(location.level || 1);
-      state.selectedLocations[selectionKind] = pallet.currentLocationId;
+      if (selectionKind && Object.prototype.hasOwnProperty.call(state.selectedLocations, selectionKind)) {
+        state.selectedLocations[selectionKind] = pallet.currentLocationId;
+      }
       return true;
     }
 
@@ -1682,22 +1725,35 @@
 
     async function savePallet() {
       try {
+        const productionYear = cleanText($('regYear').value);
+        const palletNo = state.editPalletNo
+          ? state.editPalletNo
+          : (cleanText($('regPalletNo').value) || nextPalletNo(productionYear));
+        if (!state.editPalletNo && !cleanText($('regPalletNo').value)) $('regPalletNo').value = palletNo;
         const payload = {
-          productionYear: $('regYear').value,
-          palletNo: $('regPalletNo').value,
+          productionYear,
+          palletNo,
           weight: $('regWeight').value,
           status: state.editPalletNo ? $('regStatus').value : '未配置',
           memo: $('regMemo').value,
           details: collectDetails()
         };
         const method = state.editPalletNo ? 'updatePallet' : 'registerPallet';
-        if (state.editPalletNo) payload.palletNo = state.editPalletNo;
         const res = await api(method, payload);
         applyDataResponse(res);
         clearRegisterForm();
       } catch (error) {
         showToast(error.message, true);
       }
+    }
+
+    function nextPalletNo(productionYear) {
+      const year = cleanText(productionYear);
+      if (!/^\d{4}$/.test(year)) throw new Error('年産を4桁で入力してください。');
+      const maxSerial = (state.data ? state.data.pallets : [])
+        .filter(p => String(p.productionYear) === year)
+        .reduce((max, p) => Math.max(max, Number(p.serialNo || palletSerialFromNo(p.palletNo) || 0)), 0);
+      return `${year}-${String(maxSerial + 1).padStart(4, '0')}`;
     }
 
     function collectDetails() {
@@ -2037,7 +2093,7 @@
       const details = detailsFor(pallet.palletNo);
       return `
         <div><strong>${esc(pallet.palletNo)}</strong> / ${esc(pallet.status)} / ${num(pallet.weight)}kg</div>
-        <div>場所: ${esc(pallet.currentLocationName || pallet.currentLocationId || '未配置')}</div>
+        <div>保管: ${esc(currentStorageLabel(pallet))}</div>
         <div>備考: ${esc(pallet.memo || '')}</div>
         ${details.length ? detailSummaryTable(details) : '<div class="muted">明細なし</div>'}
       `;
@@ -2100,6 +2156,7 @@
         renderMoveStartGrid();
         renderActionPallet('moveDone');
         renderMovingList();
+        setMoveMode('done');
       } catch (error) {
         showToast(error.message, true);
       }
@@ -2128,17 +2185,45 @@
 
     function renderInventoryRows() {
       const q = $('searchPallet').value.trim();
-      const rows = sortedPallets().filter(p => !q || p.palletNo.includes(q));
+      const rows = inventoryFilteredPallets(q);
       if (state.inventorySelectedPalletNo && !rows.some(p => p.palletNo === state.inventorySelectedPalletNo)) state.inventorySelectedPalletNo = '';
       $('inventoryRows').innerHTML = rows.map(p => `
-        <tr class="selectable-row ${p.palletNo === state.inventorySelectedPalletNo ? 'selected' : ''}" data-inventory-pallet="${esc(p.palletNo)}"><td>${esc(p.palletNo)}</td><td>${esc(p.status)}</td><td>${num(p.weight)}</td><td>${esc(p.currentLocationName || '')}</td><td>${esc(p.registeredAt || '')}</td></tr>
+        <tr class="selectable-row ${p.palletNo === state.inventorySelectedPalletNo ? 'selected' : ''}" data-inventory-pallet="${esc(p.palletNo)}"><td>${esc(p.palletNo)}</td><td>${esc(p.status)}</td><td>${num(p.weight)}</td><td>${esc(currentStorageLabel(p))}</td><td>${esc(p.registeredAt || '')}</td></tr>
       `).join('');
       document.querySelectorAll('[data-inventory-pallet]').forEach(row => row.addEventListener('click', () => {
-        state.inventorySelectedPalletNo = row.dataset.inventoryPallet;
-        renderCheckGrid();
-        renderInventoryRows();
-        renderInventoryPallet();
+        focusInventoryPallet(row.dataset.inventoryPallet, true);
       }));
+    }
+
+    function inventoryFilteredPallets(query) {
+      const q = cleanText(query);
+      return sortedPallets().filter(p => !q || p.palletNo.includes(q));
+    }
+
+    function handleInventorySearch() {
+      const q = cleanText($('searchPallet').value);
+      const rows = inventoryFilteredPallets(q);
+      const exact = q ? findPallet(q) : null;
+      const target = exact || (q && rows.length === 1 ? rows[0] : null);
+      if (target) {
+        focusInventoryPallet(target.palletNo, false);
+        return;
+      }
+      if (!q) state.inventorySelectedPalletNo = '';
+      renderCheckGrid();
+      renderInventoryRows();
+      renderInventoryPallet();
+    }
+
+    function focusInventoryPallet(palletNo, updateSearch) {
+      const pallet = findPallet(palletNo);
+      if (!pallet) return;
+      state.inventorySelectedPalletNo = pallet.palletNo;
+      if (updateSearch) $('searchPallet').value = pallet.palletNo;
+      if (pallet.currentLocationId) focusStoredPalletLocation(pallet.palletNo, 'checkCooler', 'checkLevel', '');
+      renderCheckGrid();
+      renderInventoryRows();
+      renderInventoryPallet();
     }
 
     function renderInventoryPallet() {
@@ -2798,6 +2883,13 @@
     function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
     function cleanText(value) { return String(value || '').trim(); }
     function selectedCooler(selectId) { const id = $(selectId).value; return activeCoolers().find(c => c.coolerId === id) || activeCoolers()[0] || null; }
+    function currentStorageLabel(pallet) {
+      if (!pallet || !pallet.currentLocationId) return '未配置';
+      const location = findLocation(pallet.currentLocationId) || parseLocationId(pallet.currentLocationId);
+      if (!location) return pallet.currentLocationId;
+      const cooler = activeCoolers().find(c => c.coolerId === location.coolerId);
+      return `${cooler ? cooler.coolerName : location.coolerId} / ${location.level}段目`;
+    }
     function findLocation(locationId) {
       return state.data && state.data.master.locations.find(loc => loc.locationId === locationId);
     }
