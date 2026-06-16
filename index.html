@@ -370,6 +370,19 @@
       margin-bottom: 10px;
       align-items: end;
     }
+    .inventory-controls {
+      grid-template-columns: minmax(180px, 1fr) minmax(132px, 180px);
+      align-items: start;
+    }
+    .control-stack {
+      display: grid;
+      gap: 8px;
+    }
+    @media (max-width: 560px) {
+      .inventory-controls {
+        grid-template-columns: 1fr;
+      }
+    }
     .operation-row {
       display: grid;
       grid-template-columns: minmax(150px, 1fr) 76px minmax(122px, 158px);
@@ -1009,16 +1022,18 @@
           <tbody id="inventoryRows"></tbody>
         </table>
       </div>
-      <div class="grid-controls">
+      <div class="grid-controls inventory-controls">
         <label>パレット検索
           <input id="searchPallet" autocomplete="off">
         </label>
-        <label>冷蔵庫
-          <select id="checkCooler"></select>
-        </label>
-        <label>段
-          <select id="checkLevel"></select>
-        </label>
+        <div class="control-stack">
+          <label>冷蔵庫
+            <select id="checkCooler"></select>
+          </label>
+          <label>段
+            <select id="checkLevel"></select>
+          </label>
+        </div>
       </div>
       <div id="checkGrid" class="location-grid"></div>
       <div id="checkPalletSummary" class="pallet-summary hidden"></div>
@@ -1978,12 +1993,6 @@
       container.innerHTML = html.join('');
     }
 
-    function setPlainGrid(container, cooler, cells) {
-      const colCount = Number(cooler.colCount || 0);
-      container.style.gridTemplateColumns = `repeat(${colCount}, minmax(78px, 1fr))`;
-      container.innerHTML = cells.join('');
-    }
-
     function renderSelectableGrid(containerId, cooler, level, kind) {
       const container = $(containerId);
       if (!cooler) {
@@ -2115,7 +2124,7 @@
         const producerNos = placed ? producerNosForPallet(placed.palletNo) : '';
         return `<button type="button" class="cell ${cls}" data-check-pallet="${esc(placed ? placed.palletNo : '')}" ${placed ? '' : 'disabled'}>${esc(label)}${producerNos ? `<span class="sub">${esc(producerNos)}</span>` : ''}</button>`;
       });
-      setPlainGrid(container, cooler, cells);
+      setGridWithCoordinates(container, cooler, cells);
       container.querySelectorAll('[data-check-pallet]').forEach(btn => btn.addEventListener('click', () => {
         state.inventorySelectedPalletNo = btn.dataset.checkPallet || '';
         renderCheckGrid();
