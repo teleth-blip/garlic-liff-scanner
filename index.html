@@ -633,6 +633,23 @@
     .search-detail-table table {
       min-width: 860px;
     }
+    .search-subtotal-title {
+      padding: 10px 10px 4px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      background: #fafcfb;
+    }
+    .search-subtotal-table {
+      border-top: 0;
+    }
+    .search-subtotal-table table {
+      min-width: 720px;
+    }
+    .search-detail-table.search-subtotal-table tr {
+      cursor: default;
+    }
     .search-detail-table tr {
       cursor: pointer;
     }
@@ -1121,12 +1138,16 @@
         </label>
       </div>
       <div class="search-section">
-        <h3>生産者別</h3>
-        <div id="producerSearchGroups" class="search-groups"></div>
+        <h3>生産者別合計</h3>
+        <div id="producerTotalGroups" class="search-groups"></div>
       </div>
       <div class="search-section">
-        <h3>冷蔵庫別</h3>
-        <div id="coolerSearchGroups" class="search-groups"></div>
+        <h3>冷蔵庫別合計</h3>
+        <div id="coolerTotalGroups" class="search-groups"></div>
+      </div>
+      <div class="search-section">
+        <h3>冷蔵庫内 規格別合計</h3>
+        <div id="coolerStandardGroups" class="search-groups"></div>
       </div>
     </section>
 
@@ -2442,16 +2463,37 @@
     function renderSearch() {
       if (!state.data) return;
       const rows = searchDetailRows();
-      const producerGroups = groupSearchRows(rows, row => `${row.producerText}|${row.standard}`, row => ({
+      const storedRows = rows.filter(row => row.location);
+      const producerGroups = groupSearchRows(rows, row => row.producerText, row => ({
         title: row.producerText || '(生産者なし)',
-        standard: row.standard || '(規格なし)'
-      })).sort((a, b) => a.title.localeCompare(b.title, 'ja') || a.standard.localeCompare(b.standard, 'ja'));
-      const coolerGroups = groupSearchRows(rows.filter(row => row.location), row => `${row.coolerName}|${row.standard}`, row => ({
+        standard: '全規格'
+      })).sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+      const coolerGroups = groupSearchRows(storedRows, row => row.coolerName, row => ({
+        title: row.coolerName || '(冷蔵庫なし)',
+        standard: '全規格'
+      })).sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+      const coolerStandardGroups = groupSearchRows(storedRows, row => `${row.coolerName}|${row.standard}`, row => ({
         title: row.coolerName || '(冷蔵庫なし)',
         standard: row.standard || '(規格なし)'
       })).sort((a, b) => a.title.localeCompare(b.title, 'ja') || a.standard.localeCompare(b.standard, 'ja'));
-      renderSearchGroups($('producerSearchGroups'), producerGroups, 'producer');
-      renderSearchGroups($('coolerSearchGroups'), coolerGroups, 'cooler');
+      renderSearchGroups($('producerTotalGroups'), producerGroups, {
+        primaryLabel: '生産者',
+        tailLabel: '保管場所',
+        tailKey: 'storageList',
+        showStandardSummary: true
+      });
+      renderSearchGroups($('coolerTotalGroups'), coolerGroups, {
+        primaryLabel: '冷蔵庫',
+        tailLabel: '生産者',
+        tailKey: 'producerList',
+        showStandardSummary: true
+      });
+      renderSearchGroups($('coolerStandardGroups'), coolerStandardGroups, {
+        primaryLabel: '冷蔵庫',
+        tailLabel: '生産者',
+        tailKey: 'producerList',
+        showStandardSummary: false
+      });
     }
 
     function searchDetailRows() {
@@ -2499,6 +2541,7 @@
             weight: 0,
             price: 0,
             rows: [],
+            standardList: new Set(),
             storageList: new Set(),
             producerList: new Set()
           });
@@ -2507,36 +2550,62 @@
         group.weight += Number(row.weight || 0);
         group.price += Number(row.price || 0);
         group.rows.push(row);
+        if (row.standard) group.standardList.add(row.standard);
         if (row.storageLabel) group.storageList.add(row.storageLabel);
         if (row.producerText) group.producerList.add(row.producerText);
       });
       return Array.from(groups.values()).map(group => ({
         ...group,
+        standardList: Array.from(group.standardList),
         storageList: Array.from(group.storageList),
         producerList: Array.from(group.producerList)
       }));
     }
 
-    function renderSearchGroups(container, groups, mode) {
+    function renderSearchGroups(container, groups, options) {
       if (!groups.length) {
         container.innerHTML = '<div class="search-empty">該当する明細がありません。</div>';
         return;
       }
       container.innerHTML = groups.map(group => {
-        const tailLabel = mode === 'producer' ? '保管場所' : '生産者';
-        const tailItems = mode === 'producer' ? group.storageList : group.producerList;
+        const tailItems = group[options.tailKey] || [];
+        const standardText = group.standard === '全規格'
+          ? (compactList(group.standardList, 4) || '全規格')
+          : group.standard;
         return `<details class="search-group">
           <summary>
-            <span><span class="search-summary-label">${mode === 'producer' ? '生産者' : '冷蔵庫'}</span>${esc(group.title)}</span>
-            <span><span class="search-summary-label">規格</span>${esc(group.standard)}</span>
+            <span><span class="search-summary-label">${esc(options.primaryLabel)}</span>${esc(group.title)}</span>
+            <span><span class="search-summary-label">規格</span>${esc(standardText)}</span>
             <span><span class="search-summary-label">重量</span>${num(group.weight)}kg</span>
             <span><span class="search-summary-label">価格</span>${num(group.price)}</span>
-            <span><span class="search-summary-label">${tailLabel} / ${group.rows.length}件</span>${esc(compactList(tailItems))}</span>
+            <span><span class="search-summary-label">${esc(options.tailLabel)} / ${group.rows.length}件</span>${esc(compactList(tailItems))}</span>
           </summary>
-          ${searchDetailTable(group.rows)}
+          ${searchGroupBody(group.rows, !!options.showStandardSummary)}
         </details>`;
       }).join('');
       bindSearchDetailActions(container);
+    }
+
+    function searchGroupBody(rows, showStandardSummary) {
+      return `${showStandardSummary ? searchStandardSummaryTable(rows) : ''}${searchDetailTable(rows)}`;
+    }
+
+    function searchStandardSummaryTable(rows) {
+      const groups = groupSearchRows(rows, row => row.standard || '(規格なし)', row => ({
+        title: row.standard || '(規格なし)',
+        standard: row.standard || '(規格なし)'
+      })).sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+      return `<div class="search-subtotal-title">規格別小計</div><div class="search-detail-table search-subtotal-table"><table>
+        <thead><tr><th>規格</th><th>重量</th><th>価格</th><th>生産者</th><th>保管場所</th><th>明細数</th></tr></thead>
+        <tbody>${groups.map(group => `<tr>
+          <td>${esc(group.title)}</td>
+          <td>${num(group.weight)}kg</td>
+          <td>${num(group.price)}</td>
+          <td>${esc(compactList(group.producerList))}</td>
+          <td>${esc(compactList(group.storageList))}</td>
+          <td>${num(group.rows.length)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
     }
 
     function searchDetailTable(rows) {
