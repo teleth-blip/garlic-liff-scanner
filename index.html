@@ -578,6 +578,83 @@
       color: var(--muted);
       font-weight: 700;
     }
+    .search-section {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .search-groups {
+      display: grid;
+      gap: 8px;
+    }
+    .search-group {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .search-group > summary {
+      display: grid;
+      grid-template-columns: minmax(140px, 1.5fr) minmax(70px, .7fr) minmax(70px, .7fr) minmax(80px, .8fr) minmax(150px, 1.5fr) minmax(56px, auto);
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      list-style: none;
+    }
+    .search-group > summary::-webkit-details-marker {
+      display: none;
+    }
+    .search-group > summary::after {
+      content: "開く";
+      justify-self: end;
+      padding: 3px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .search-group[open] > summary::after {
+      content: "閉じる";
+    }
+    .search-summary-label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .search-detail-table {
+      border-top: 1px solid var(--line);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .search-detail-table table {
+      min-width: 860px;
+    }
+    .search-detail-table tr {
+      cursor: pointer;
+    }
+    .search-detail-table td:last-child {
+      white-space: nowrap;
+    }
+    .search-empty {
+      padding: 12px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-weight: 700;
+      background: #fff;
+    }
+    @media (max-width: 720px) {
+      .search-group > summary {
+        grid-template-columns: 1fr 1fr;
+      }
+      .search-group > summary::after {
+        grid-column: 2;
+      }
+    }
     details.master-section {
       margin-bottom: 10px;
       border: 1px solid var(--line);
@@ -829,6 +906,7 @@
       <button type="button" class="tab" data-tab="outbound">出庫</button>
       <button type="button" class="tab" data-tab="move">移動</button>
       <button type="button" class="tab" data-tab="inventory">配置確認</button>
+      <button type="button" class="tab" data-tab="search">検索</button>
       <button type="button" class="tab" data-tab="master">マスタ</button>
     </nav>
 
@@ -1034,6 +1112,22 @@
       </div>
       <div id="checkGrid" class="location-grid"></div>
       <div id="checkPalletSummary" class="pallet-summary hidden"></div>
+    </section>
+
+    <section id="searchPanel" class="panel hidden" data-panel="search">
+      <div class="operation-row">
+        <label>検索
+          <input id="searchQuery" autocomplete="off" placeholder="生産者・規格・冷蔵庫・パレット番号">
+        </label>
+      </div>
+      <div class="search-section">
+        <h3>生産者別</h3>
+        <div id="producerSearchGroups" class="search-groups"></div>
+      </div>
+      <div class="search-section">
+        <h3>冷蔵庫別</h3>
+        <div id="coolerSearchGroups" class="search-groups"></div>
+      </div>
     </section>
 
     <section id="masterPanel" class="panel hidden" data-panel="master">
@@ -1244,6 +1338,7 @@
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
+      $('searchQuery').addEventListener('input', renderSearch);
       $('addStandardBtn').addEventListener('click', addStandardRow);
       $('saveStandardsBtn').addEventListener('click', () => withBusy('saveStandardsBtn', '保存中...', saveStandards));
       $('addCoolerBtn').addEventListener('click', addCoolerRow);
@@ -1355,6 +1450,7 @@
       renderCheckGrid();
       renderInventoryRows();
       renderInventoryPallet();
+      renderSearch();
       renderMaster();
       renderActionPallet('in');
       renderActionPallet('out');
@@ -2343,6 +2439,172 @@
       el.innerHTML = palletSummaryHtml(pallet);
     }
 
+    function renderSearch() {
+      if (!state.data) return;
+      const rows = searchDetailRows();
+      const producerGroups = groupSearchRows(rows, row => `${row.producerText}|${row.standard}`, row => ({
+        title: row.producerText || '(生産者なし)',
+        standard: row.standard || '(規格なし)'
+      })).sort((a, b) => a.title.localeCompare(b.title, 'ja') || a.standard.localeCompare(b.standard, 'ja'));
+      const coolerGroups = groupSearchRows(rows.filter(row => row.location), row => `${row.coolerName}|${row.standard}`, row => ({
+        title: row.coolerName || '(冷蔵庫なし)',
+        standard: row.standard || '(規格なし)'
+      })).sort((a, b) => a.title.localeCompare(b.title, 'ja') || a.standard.localeCompare(b.standard, 'ja'));
+      renderSearchGroups($('producerSearchGroups'), producerGroups, 'producer');
+      renderSearchGroups($('coolerSearchGroups'), coolerGroups, 'cooler');
+    }
+
+    function searchDetailRows() {
+      const query = cleanText($('searchQuery').value).toLowerCase();
+      return (state.data.details || []).map(detail => {
+        const pallet = findPallet(detail.palletNo) || {};
+        const location = pallet.currentLocationId ? (findLocation(pallet.currentLocationId) || parseLocationId(pallet.currentLocationId)) : null;
+        const cooler = location ? activeCoolers().find(c => c.coolerId === location.coolerId) : null;
+        const producerText = producerLabel(detail) || '(生産者なし)';
+        const storageLabel = currentStorageDetailLabel(pallet);
+        const row = {
+          ...detail,
+          pallet,
+          palletStatus: pallet.status || '',
+          storageLabel,
+          location,
+          coolerName: cooler ? cooler.coolerName : (location ? location.coolerId : ''),
+          producerText
+        };
+        row.searchText = [
+          row.palletNo,
+          row.palletStatus,
+          row.producerNo,
+          row.producerName,
+          producerText,
+          row.standard,
+          storageLabel,
+          row.coolerName
+        ].filter(Boolean).join(' ').toLowerCase();
+        return row;
+      }).filter(row => !query || row.searchText.includes(query))
+        .sort((a, b) => a.producerText.localeCompare(b.producerText, 'ja')
+          || a.standard.localeCompare(b.standard, 'ja')
+          || a.palletNo.localeCompare(b.palletNo, 'ja')
+          || a.detailNo - b.detailNo);
+    }
+
+    function groupSearchRows(rows, keyFn, metaFn) {
+      const groups = new Map();
+      rows.forEach(row => {
+        const key = keyFn(row);
+        if (!groups.has(key)) {
+          groups.set(key, {
+            ...metaFn(row),
+            weight: 0,
+            price: 0,
+            rows: [],
+            storageList: new Set(),
+            producerList: new Set()
+          });
+        }
+        const group = groups.get(key);
+        group.weight += Number(row.weight || 0);
+        group.price += Number(row.price || 0);
+        group.rows.push(row);
+        if (row.storageLabel) group.storageList.add(row.storageLabel);
+        if (row.producerText) group.producerList.add(row.producerText);
+      });
+      return Array.from(groups.values()).map(group => ({
+        ...group,
+        storageList: Array.from(group.storageList),
+        producerList: Array.from(group.producerList)
+      }));
+    }
+
+    function renderSearchGroups(container, groups, mode) {
+      if (!groups.length) {
+        container.innerHTML = '<div class="search-empty">該当する明細がありません。</div>';
+        return;
+      }
+      container.innerHTML = groups.map(group => {
+        const tailLabel = mode === 'producer' ? '保管場所' : '生産者';
+        const tailItems = mode === 'producer' ? group.storageList : group.producerList;
+        return `<details class="search-group">
+          <summary>
+            <span><span class="search-summary-label">${mode === 'producer' ? '生産者' : '冷蔵庫'}</span>${esc(group.title)}</span>
+            <span><span class="search-summary-label">規格</span>${esc(group.standard)}</span>
+            <span><span class="search-summary-label">重量</span>${num(group.weight)}kg</span>
+            <span><span class="search-summary-label">価格</span>${num(group.price)}</span>
+            <span><span class="search-summary-label">${tailLabel} / ${group.rows.length}件</span>${esc(compactList(tailItems))}</span>
+          </summary>
+          ${searchDetailTable(group.rows)}
+        </details>`;
+      }).join('');
+      bindSearchDetailActions(container);
+    }
+
+    function searchDetailTable(rows) {
+      return `<div class="search-detail-table"><table>
+        <thead><tr><th>パレット</th><th>状態</th><th>保管場所</th><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>操作</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr data-search-pallet="${esc(row.palletNo)}">
+            <td>${esc(row.palletNo)}</td>
+            <td>${esc(row.palletStatus)}</td>
+            <td>${esc(row.storageLabel)}</td>
+            <td>${esc(row.producerText)}</td>
+            <td>${esc(row.standard)}</td>
+            <td>${num(row.weight)}</td>
+            <td>${num(row.price)}</td>
+            <td>
+              <button type="button" class="secondary small" data-search-inventory="${esc(row.palletNo)}">配置確認</button>
+              <button type="button" class="secondary small" data-search-outbound="${esc(row.palletNo)}" ${row.location ? '' : 'disabled'}>出庫</button>
+            </td>
+          </tr>
+        `).join('')}</tbody>
+      </table></div>`;
+    }
+
+    function bindSearchDetailActions(container) {
+      container.querySelectorAll('[data-search-pallet]').forEach(row => row.addEventListener('click', event => {
+        if (event.target.closest('button')) return;
+        openSearchPallet(row.dataset.searchPallet, 'inventory');
+      }));
+      container.querySelectorAll('[data-search-inventory]').forEach(btn => btn.addEventListener('click', event => {
+        event.stopPropagation();
+        openSearchPallet(btn.dataset.searchInventory, 'inventory');
+      }));
+      container.querySelectorAll('[data-search-outbound]').forEach(btn => btn.addEventListener('click', event => {
+        event.stopPropagation();
+        openSearchPallet(btn.dataset.searchOutbound, 'outbound');
+      }));
+    }
+
+    function openSearchPallet(palletNo, target) {
+      const pallet = findPallet(palletNo);
+      if (!pallet) return;
+      dismissLaunchPanel();
+      if (target === 'outbound') {
+        setTab('outbound');
+        $('outPalletNo').value = pallet.palletNo;
+        state.selectedLocations.outbound = '';
+        state.lockedPallets.outbound = '';
+        renderPalletLocks();
+        if (pallet.currentLocationId) focusStoredPalletLocation(pallet.palletNo, 'outCooler', 'outLevel', 'outbound');
+        else showToast('現在の保管場所がないため出庫画面でハイライトできません。', true);
+        renderActionPallet('out');
+        renderOutboundGrid();
+        $('outboundPanel').scrollIntoView({ block: 'start' });
+        return;
+      }
+      setTab('inventory');
+      $('searchPallet').value = pallet.palletNo;
+      focusInventoryPallet(pallet.palletNo, true);
+      $('inventoryPanel').scrollIntoView({ block: 'start' });
+    }
+
+    function compactList(items, limit = 3) {
+      const values = [...new Set((items || []).map(cleanText).filter(Boolean))];
+      if (!values.length) return '';
+      if (values.length <= limit) return values.join(' / ');
+      return `${values.slice(0, limit).join(' / ')} 他${values.length - limit}件`;
+    }
+
     function renderMaster() {
       renderStandardRows();
       renderCoolerRows();
@@ -3110,6 +3372,13 @@
       if (!location) return pallet.currentLocationId;
       const cooler = activeCoolers().find(c => c.coolerId === location.coolerId);
       return `${cooler ? cooler.coolerName : location.coolerId} / ${location.level}段目`;
+    }
+    function currentStorageDetailLabel(pallet) {
+      if (!pallet || !pallet.currentLocationId) return pallet && pallet.status ? pallet.status : '未配置';
+      const location = findLocation(pallet.currentLocationId) || parseLocationId(pallet.currentLocationId);
+      if (!location) return pallet.currentLocationId;
+      const cooler = activeCoolers().find(c => c.coolerId === location.coolerId);
+      return `${cooler ? cooler.coolerName : location.coolerId} / ${location.level}段目 / ${location.row}行${location.col}列`;
     }
     function findLocation(locationId) {
       return state.data && state.data.master.locations.find(loc => loc.locationId === locationId);
