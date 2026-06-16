@@ -828,17 +828,34 @@ begin
     values (v_row_no, v_col_no, v_usable);
   end loop;
 
+  if exists (
+    select 1
+      from tmp_save_locations t
+      cross join generate_series(p_level_no, v_cooler.max_levels) as gs(level_no)
+      join public.locations l
+        on l.cooler_id = v_cooler.cooler_id
+       and l.level_no = gs.level_no
+       and l.row_no = t.row_no
+       and l.col_no = t.col_no
+      join public.placements p
+        on p.location_id = l.location_id
+     where t.usable = false
+  ) then
+    raise exception '使用中の保管場所は使用不可にできません。';
+  end if;
+
   insert into public.locations (location_id, cooler_id, level_no, row_no, col_no, display_name, usable, note)
   select
-    v_cooler.cooler_id || '-' || p_level_no || '-R' || lpad(row_no::text, 2, '0') || '-C' || lpad(col_no::text, 2, '0'),
+    v_cooler.cooler_id || '-' || gs.level_no || '-R' || lpad(t.row_no::text, 2, '0') || '-C' || lpad(t.col_no::text, 2, '0'),
     v_cooler.cooler_id,
-    p_level_no,
-    row_no,
-    col_no,
-    'R' || lpad(row_no::text, 2, '0') || '-C' || lpad(col_no::text, 2, '0'),
-    usable,
-    case when usable then '' else '使用不可' end
-  from tmp_save_locations
+    gs.level_no,
+    t.row_no,
+    t.col_no,
+    'R' || lpad(t.row_no::text, 2, '0') || '-C' || lpad(t.col_no::text, 2, '0'),
+    t.usable,
+    case when t.usable then '' else '使用不可' end
+  from tmp_save_locations t
+  cross join generate_series(p_level_no, v_cooler.max_levels) as gs(level_no)
   on conflict (location_id) do update
     set display_name = excluded.display_name,
         usable = excluded.usable,
@@ -847,7 +864,7 @@ begin
 
   delete from public.locations l
    where l.cooler_id = v_cooler.cooler_id
-     and l.level_no = p_level_no
+     and l.level_no between p_level_no and v_cooler.max_levels
      and not exists (
        select 1
          from tmp_save_locations t
@@ -855,7 +872,7 @@ begin
           and t.col_no = l.col_no
      );
 
-  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '保管場所マスタを保存しました: ' || v_cooler.cooler_id || ' ' || p_level_no || '段', '');
+  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '保管場所マスタを保存しました: ' || v_cooler.cooler_id || ' ' || p_level_no || '段目以降', '');
 
   return jsonb_build_object('ok', true, 'message', '保管場所マスタを保存しました。');
 exception
