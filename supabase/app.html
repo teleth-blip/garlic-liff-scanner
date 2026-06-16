@@ -598,7 +598,14 @@
     #masterPanel .table-wrap {
       max-height: none;
       overflow-x: auto;
-      overflow-y: visible;
+      overflow-y: hidden;
+      overscroll-behavior: auto;
+      touch-action: pan-x pan-y;
+    }
+    #masterPanel input,
+    #masterPanel select,
+    #masterPanel textarea {
+      touch-action: pan-y;
     }
     #toast {
       position: fixed;
@@ -1181,6 +1188,7 @@
         if (!event.target.closest('.producer-cell')) closeProducerSuggestions();
         if (!event.target.closest('.pallet-pick-field')) closePalletSuggestions();
       });
+      bindMasterScrollAssist();
       $('reloadBtn').addEventListener('click', refreshAll);
       $('logoutBtn').addEventListener('click', logout);
       $('loginForm').addEventListener('submit', event => {
@@ -1246,6 +1254,49 @@
       $('addWorkerBtn').addEventListener('click', addWorkerRow);
       $('saveWorkersBtn').addEventListener('click', () => withBusy('saveWorkersBtn', '保存中...', saveWorkers));
       $('saveProducerSettingsBtn').addEventListener('click', () => withBusy('saveProducerSettingsBtn', '保存中...', saveProducerSettings));
+    }
+
+    function bindMasterScrollAssist() {
+      const panel = $('masterPanel');
+      let drag = null;
+      const findField = target => target && target.closest && target.closest('#masterPanel input, #masterPanel select, #masterPanel textarea');
+
+      panel.addEventListener('wheel', event => {
+        if (!findField(event.target) || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+        window.scrollBy({ top: event.deltaY, left: 0, behavior: 'auto' });
+        event.preventDefault();
+      }, { passive: false });
+
+      panel.addEventListener('touchstart', event => {
+        const field = findField(event.target);
+        if (!field || event.touches.length !== 1) {
+          drag = null;
+          return;
+        }
+        const touch = event.touches[0];
+        drag = { startX: touch.clientX, startY: touch.clientY, lastY: touch.clientY, active: false };
+      }, { passive: true });
+
+      panel.addEventListener('touchmove', event => {
+        if (!drag || event.touches.length !== 1) return;
+        const touch = event.touches[0];
+        const dx = touch.clientX - drag.startX;
+        const dy = touch.clientY - drag.startY;
+        if (!drag.active) {
+          if (Math.abs(dy) < 12 || Math.abs(dy) <= Math.abs(dx)) return;
+          drag.active = true;
+          if (document.activeElement && panel.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+          }
+        }
+        window.scrollBy(0, drag.lastY - touch.clientY);
+        drag.lastY = touch.clientY;
+        event.preventDefault();
+      }, { passive: false });
+
+      ['touchend', 'touchcancel'].forEach(type => {
+        panel.addEventListener(type, () => { drag = null; }, { passive: true });
+      });
     }
 
     async function withBusy(buttonId, busyText, task) {
