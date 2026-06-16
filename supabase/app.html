@@ -2199,18 +2199,19 @@
         const keepLockedForMoveDone = state.lockedPallets.moveStart === cleanText(palletNo);
         const res = await api('startMove', { palletNo, memo: $('moveStartMemo').value });
         applyDataResponse(res);
-        $('moveDonePalletNo').value = palletNo;
         $('moveStartPalletNo').value = '';
         $('moveStartMemo').value = '';
         state.selectedLocations.moveStart = '';
         state.lockedPallets.moveStart = '';
-        if (keepLockedForMoveDone) state.lockedPallets.moveDone = cleanText(palletNo);
+        if (keepLockedForMoveDone) {
+          $('moveDonePalletNo').value = palletNo;
+          state.lockedPallets.moveDone = cleanText(palletNo);
+        }
         renderPalletLocks();
         renderActionPallet('moveStart');
         renderMoveStartGrid();
         renderActionPallet('moveDone');
         renderMovingList();
-        setMoveMode('done');
       } catch (error) {
         showToast(error.message, true);
       }
