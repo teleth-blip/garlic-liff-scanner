@@ -602,11 +602,388 @@ begin
 end;
 $$;
 
+create or replace function public.save_standards(p_worker_id text, p_rows jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_worker public.workers%rowtype;
+  v_row jsonb;
+  v_id text;
+  v_name text;
+  v_order integer;
+  v_active boolean;
+begin
+  v_worker := public.require_active_worker(p_worker_id);
+
+  if coalesce(jsonb_typeof(p_rows), 'array') <> 'array' then
+    raise exception '規格マスタの形式が不正です。';
+  end if;
+
+  drop table if exists pg_temp.tmp_save_standards;
+  create temp table tmp_save_standards (
+    standard_id text primary key,
+    standard_name text not null,
+    display_order integer not null,
+    active boolean not null
+  ) on commit drop;
+
+  for v_row in select value from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb))
+  loop
+    v_id := btrim(coalesce(v_row->>'standardId', ''));
+    v_name := btrim(coalesce(v_row->>'standardName', ''));
+    if v_id = '' and v_name = '' then
+      continue;
+    end if;
+    if v_id = '' then
+      raise exception '規格IDを入力してください。';
+    end if;
+    if v_name = '' then
+      raise exception '規格名を入力してください: %', v_id;
+    end if;
+    v_order := case when btrim(coalesce(v_row->>'displayOrder', '')) ~ '^\d+$'
+      then (v_row->>'displayOrder')::integer else 999 end;
+    v_active := coalesce((v_row->>'active')::boolean, true);
+
+    insert into tmp_save_standards (standard_id, standard_name, display_order, active)
+    values (v_id, v_name, v_order, v_active);
+  end loop;
+
+  if not exists (select 1 from tmp_save_standards where active = true) then
+    raise exception '有効な規格を1件以上残してください。';
+  end if;
+
+  delete from public.standards s
+   where not exists (
+     select 1 from tmp_save_standards t where t.standard_id = s.standard_id
+   );
+
+  insert into public.standards (standard_id, standard_name, display_order, active)
+  select standard_id, standard_name, display_order, active
+    from tmp_save_standards
+  on conflict (standard_id) do update
+    set standard_name = excluded.standard_name,
+        display_order = excluded.display_order,
+        active = excluded.active,
+        updated_at = now();
+
+  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '規格マスタを保存しました。', '');
+
+  return jsonb_build_object('ok', true, 'message', '規格マスタを保存しました。');
+exception
+  when unique_violation then
+    raise exception '規格IDが重複しています。';
+end;
+$$;
+
+create or replace function public.save_coolers(p_worker_id text, p_rows jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_worker public.workers%rowtype;
+  v_row jsonb;
+  v_id text;
+  v_name text;
+  v_max_levels integer;
+  v_row_count integer;
+  v_col_count integer;
+  v_active boolean;
+begin
+  v_worker := public.require_active_worker(p_worker_id);
+
+  if coalesce(jsonb_typeof(p_rows), 'array') <> 'array' then
+    raise exception '冷蔵庫マスタの形式が不正です。';
+  end if;
+
+  drop table if exists pg_temp.tmp_save_coolers;
+  create temp table tmp_save_coolers (
+    cooler_id text primary key,
+    cooler_name text not null,
+    max_levels integer not null,
+    row_count integer not null,
+    col_count integer not null,
+    active boolean not null
+  ) on commit drop;
+
+  for v_row in select value from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb))
+  loop
+    v_id := btrim(coalesce(v_row->>'coolerId', ''));
+    v_name := btrim(coalesce(v_row->>'coolerName', ''));
+    if v_id = '' and v_name = '' then
+      continue;
+    end if;
+    if v_id = '' then
+      raise exception '冷蔵庫IDを入力してください。';
+    end if;
+    if v_name = '' then
+      raise exception '冷蔵庫名を入力してください: %', v_id;
+    end if;
+    v_max_levels := case when btrim(coalesce(v_row->>'maxLevel', '')) ~ '^\d+$'
+      then (v_row->>'maxLevel')::integer else 1 end;
+    v_row_count := case when btrim(coalesce(v_row->>'rowCount', '')) ~ '^\d+$'
+      then (v_row->>'rowCount')::integer else 1 end;
+    v_col_count := case when btrim(coalesce(v_row->>'colCount', '')) ~ '^\d+$'
+      then (v_row->>'colCount')::integer else 1 end;
+    v_active := coalesce((v_row->>'active')::boolean, true);
+
+    if v_max_levels < 1 or v_max_levels > 3 then
+      raise exception '最大段数は1〜3で入力してください: %', v_id;
+    end if;
+    if v_row_count < 1 or v_row_count > 30 or v_col_count < 1 or v_col_count > 30 then
+      raise exception '行数・列数は1〜30で入力してください: %', v_id;
+    end if;
+
+    insert into tmp_save_coolers (cooler_id, cooler_name, max_levels, row_count, col_count, active)
+    values (v_id, v_name, v_max_levels, v_row_count, v_col_count, v_active);
+  end loop;
+
+  if not exists (select 1 from tmp_save_coolers where active = true) then
+    raise exception '有効な冷蔵庫を1件以上残してください。';
+  end if;
+
+  insert into public.coolers (cooler_id, cooler_name, max_levels, row_count, col_count, active)
+  select cooler_id, cooler_name, max_levels, row_count, col_count, active
+    from tmp_save_coolers
+  on conflict (cooler_id) do update
+    set cooler_name = excluded.cooler_name,
+        max_levels = excluded.max_levels,
+        row_count = excluded.row_count,
+        col_count = excluded.col_count,
+        active = excluded.active,
+        updated_at = now();
+
+  delete from public.coolers c
+   where not exists (
+     select 1 from tmp_save_coolers t where t.cooler_id = c.cooler_id
+   );
+
+  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '冷蔵庫マスタを保存しました。', '');
+
+  return jsonb_build_object('ok', true, 'message', '冷蔵庫マスタを保存しました。');
+exception
+  when unique_violation then
+    raise exception '冷蔵庫IDが重複しています。';
+  when foreign_key_violation then
+    raise exception '使用中の冷蔵庫または保管場所は削除できません。有効をOFFにしてください。';
+end;
+$$;
+
+create or replace function public.save_location_grid(p_worker_id text, p_cooler_id text, p_level_no integer, p_cells jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_worker public.workers%rowtype;
+  v_cooler public.coolers%rowtype;
+  v_row jsonb;
+  v_row_no integer;
+  v_col_no integer;
+  v_usable boolean;
+begin
+  v_worker := public.require_active_worker(p_worker_id);
+
+  select *
+    into v_cooler
+    from public.coolers
+   where cooler_id = btrim(coalesce(p_cooler_id, ''));
+
+  if not found then
+    raise exception '冷蔵庫が見つかりません: %', p_cooler_id;
+  end if;
+
+  if p_level_no < 1 or p_level_no > v_cooler.max_levels then
+    raise exception '段が冷蔵庫の最大段数を超えています。';
+  end if;
+
+  if coalesce(jsonb_typeof(p_cells), 'array') <> 'array' then
+    raise exception '保管場所マスタの形式が不正です。';
+  end if;
+
+  drop table if exists pg_temp.tmp_save_locations;
+  create temp table tmp_save_locations (
+    row_no integer not null,
+    col_no integer not null,
+    usable boolean not null,
+    primary key (row_no, col_no)
+  ) on commit drop;
+
+  for v_row in select value from jsonb_array_elements(coalesce(p_cells, '[]'::jsonb))
+  loop
+    v_row_no := coalesce((v_row->>'row')::integer, 0);
+    v_col_no := coalesce((v_row->>'col')::integer, 0);
+    v_usable := coalesce((v_row->>'available')::boolean, true);
+
+    if v_row_no < 1 or v_row_no > v_cooler.row_count or v_col_no < 1 or v_col_no > v_cooler.col_count then
+      raise exception '保管場所の行・列が冷蔵庫マスタの範囲外です。';
+    end if;
+
+    insert into tmp_save_locations (row_no, col_no, usable)
+    values (v_row_no, v_col_no, v_usable);
+  end loop;
+
+  insert into public.locations (location_id, cooler_id, level_no, row_no, col_no, display_name, usable, note)
+  select
+    v_cooler.cooler_id || '-' || p_level_no || '-R' || lpad(row_no::text, 2, '0') || '-C' || lpad(col_no::text, 2, '0'),
+    v_cooler.cooler_id,
+    p_level_no,
+    row_no,
+    col_no,
+    'R' || lpad(row_no::text, 2, '0') || '-C' || lpad(col_no::text, 2, '0'),
+    usable,
+    case when usable then '' else '使用不可' end
+  from tmp_save_locations
+  on conflict (location_id) do update
+    set display_name = excluded.display_name,
+        usable = excluded.usable,
+        note = excluded.note,
+        updated_at = now();
+
+  delete from public.locations l
+   where l.cooler_id = v_cooler.cooler_id
+     and l.level_no = p_level_no
+     and not exists (
+       select 1
+         from tmp_save_locations t
+        where t.row_no = l.row_no
+          and t.col_no = l.col_no
+     );
+
+  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '保管場所マスタを保存しました: ' || v_cooler.cooler_id || ' ' || p_level_no || '段', '');
+
+  return jsonb_build_object('ok', true, 'message', '保管場所マスタを保存しました。');
+exception
+  when unique_violation then
+    raise exception '保管場所マスタに重複したマスがあります。';
+  when foreign_key_violation then
+    raise exception '使用中の保管場所は削除できません。';
+end;
+$$;
+
+create or replace function public.save_workers(p_worker_id text, p_rows jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_worker public.workers%rowtype;
+  v_row jsonb;
+  v_id text;
+  v_name text;
+  v_role text;
+  v_order integer;
+  v_active boolean;
+  v_note text;
+begin
+  v_worker := public.require_active_worker(p_worker_id);
+
+  if coalesce(jsonb_typeof(p_rows), 'array') <> 'array' then
+    raise exception '作業者マスタの形式が不正です。';
+  end if;
+
+  drop table if exists pg_temp.tmp_save_workers;
+  create temp table tmp_save_workers (
+    worker_id text primary key,
+    worker_name text not null,
+    role text not null,
+    display_order integer not null,
+    active boolean not null,
+    note text not null
+  ) on commit drop;
+
+  for v_row in select value from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb))
+  loop
+    v_id := btrim(coalesce(v_row->>'workerId', ''));
+    v_name := btrim(coalesce(v_row->>'workerName', ''));
+    if v_id = '' and v_name = '' then
+      continue;
+    end if;
+    if v_id = '' then
+      raise exception '作業者IDを入力してください。';
+    end if;
+    if v_name = '' then
+      raise exception '作業者名を入力してください: %', v_id;
+    end if;
+
+    v_role := btrim(coalesce(v_row->>'role', 'operator'));
+    if v_role not in ('admin', 'operator', 'viewer') then
+      raise exception '作業者の権限が不正です: %', v_id;
+    end if;
+
+    v_order := case when btrim(coalesce(v_row->>'displayOrder', '')) ~ '^\d+$'
+      then (v_row->>'displayOrder')::integer else 999 end;
+    v_active := coalesce((v_row->>'active')::boolean, true);
+    v_note := coalesce(v_row->>'note', '');
+
+    insert into tmp_save_workers (worker_id, worker_name, role, display_order, active, note)
+    values (v_id, v_name, v_role, v_order, v_active, v_note);
+  end loop;
+
+  if not exists (select 1 from tmp_save_workers where active = true) then
+    raise exception '有効な作業者を1件以上残してください。';
+  end if;
+
+  if not exists (
+    select 1
+      from tmp_save_workers
+     where worker_id = v_worker.worker_id
+       and active = true
+  ) then
+    raise exception '現在の作業者は有効のまま残してください。';
+  end if;
+
+  insert into public.workers (worker_id, worker_name, role, display_order, active, note)
+  select worker_id, worker_name, role, display_order, active, note
+    from tmp_save_workers
+  on conflict (worker_id) do update
+    set worker_name = excluded.worker_name,
+        role = excluded.role,
+        display_order = excluded.display_order,
+        active = excluded.active,
+        note = excluded.note,
+        updated_at = now();
+
+  delete from public.workers w
+   where not exists (
+     select 1 from tmp_save_workers t where t.worker_id = w.worker_id
+   )
+     and not exists (select 1 from public.pallets p where p.registered_worker_id = w.worker_id or p.updated_worker_id = w.worker_id)
+     and not exists (select 1 from public.placements p where p.updated_worker_id = w.worker_id)
+     and not exists (select 1 from public.moving_pallets m where m.worker_id = w.worker_id)
+     and not exists (select 1 from public.operation_histories h where h.worker_id = w.worker_id);
+
+  update public.workers w
+     set active = false,
+         updated_at = now()
+   where not exists (
+     select 1 from tmp_save_workers t where t.worker_id = w.worker_id
+   );
+
+  perform public.write_history(v_worker, 'マスタ設定', '', '', '', '作業者マスタを保存しました。', '');
+
+  return jsonb_build_object('ok', true, 'message', '作業者マスタを保存しました。');
+exception
+  when unique_violation then
+    raise exception '作業者IDが重複しています。';
+end;
+$$;
+
 revoke all on function public.require_active_worker(text) from public, anon, authenticated;
 revoke all on function public.require_location_can_receive(text) from public, anon, authenticated;
 revoke all on function public.require_location_can_remove(text) from public, anon, authenticated;
 revoke all on function public.write_history(public.workers, text, text, text, text, text, text) from public, anon, authenticated;
 revoke all on function public.save_app_setting(text, text, jsonb) from public, anon, authenticated;
+revoke all on function public.save_standards(text, jsonb) from public, anon, authenticated;
+revoke all on function public.save_coolers(text, jsonb) from public, anon, authenticated;
+revoke all on function public.save_location_grid(text, text, integer, jsonb) from public, anon, authenticated;
+revoke all on function public.save_workers(text, jsonb) from public, anon, authenticated;
 
 grant execute on function public.ping_write_api() to anon;
 grant execute on function public.upsert_pallet(jsonb) to anon;
@@ -616,3 +993,7 @@ grant execute on function public.record_outbound(text, text, text) to anon;
 grant execute on function public.start_move(text, text, text) to anon;
 grant execute on function public.complete_move(text, text, text, text) to anon;
 grant execute on function public.save_app_setting(text, text, jsonb) to anon;
+grant execute on function public.save_standards(text, jsonb) to anon;
+grant execute on function public.save_coolers(text, jsonb) to anon;
+grant execute on function public.save_location_grid(text, text, integer, jsonb) to anon;
+grant execute on function public.save_workers(text, jsonb) to anon;

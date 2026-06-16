@@ -30,6 +30,14 @@ Supabase版で登録・入庫・出庫・移動を安全に実行するため、
 - `record_outbound`
 - `start_move`
 - `complete_move`
+- `save_standards`
+- `save_coolers`
+- `save_location_grid`
+- `save_workers`
+- `save_app_setting`
+
+マスタ編集を使う場合も、この `rpc.sql` を最新内容で実行してください。
+古いRPCのままだと、画面の保存ボタンを押したときに `Could not find the function ...` のようなエラーになります。
 
 ## 3. 現在のスプレッドシートデータを反映
 

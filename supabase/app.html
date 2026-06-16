@@ -2569,10 +2569,27 @@
             p_setting_value: payload
           });
         case 'saveStandards':
+          return writeAndRefresh('save_standards', {
+            p_worker_id: state.workerId,
+            p_rows: payload.rows || []
+          });
         case 'saveCoolers':
+          return writeAndRefresh('save_coolers', {
+            p_worker_id: state.workerId,
+            p_rows: payload.rows || []
+          });
         case 'saveLocationGrid':
+          return writeAndRefresh('save_location_grid', {
+            p_worker_id: state.workerId,
+            p_cooler_id: payload.coolerId,
+            p_level_no: payload.level,
+            p_cells: payload.cells || []
+          });
         case 'saveWorkers':
-          throw new Error('Supabase版のマスタ編集は次の段階です。現在は既存版で編集してください。');
+          return writeAndRefresh('save_workers', {
+            p_worker_id: state.workerId,
+            p_rows: payload.rows || []
+          });
         default:
           throw new Error(`未対応のAPIです: ${method || '(空)'}`);
       }
