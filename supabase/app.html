@@ -370,19 +370,6 @@
       margin-bottom: 10px;
       align-items: end;
     }
-    .inventory-controls {
-      grid-template-columns: minmax(180px, 1fr) minmax(132px, 180px);
-      align-items: start;
-    }
-    .control-stack {
-      display: grid;
-      gap: 8px;
-    }
-    @media (max-width: 560px) {
-      .inventory-controls {
-        grid-template-columns: 1fr;
-      }
-    }
     .operation-row {
       display: grid;
       grid-template-columns: minmax(150px, 1fr) 76px minmax(122px, 158px);
@@ -1022,18 +1009,16 @@
           <tbody id="inventoryRows"></tbody>
         </table>
       </div>
-      <div class="grid-controls inventory-controls">
-        <label>パレット検索
+      <div class="operation-row">
+        <label>冷蔵庫
+          <select id="checkCooler"></select>
+        </label>
+        <label>段
+          <select id="checkLevel"></select>
+        </label>
+        <label>パレット番号
           <input id="searchPallet" autocomplete="off">
         </label>
-        <div class="control-stack">
-          <label>冷蔵庫
-            <select id="checkCooler"></select>
-          </label>
-          <label>段
-            <select id="checkLevel"></select>
-          </label>
-        </div>
       </div>
       <div id="checkGrid" class="location-grid"></div>
       <div id="checkPalletSummary" class="pallet-summary hidden"></div>
