@@ -21,3 +21,9 @@ https://teleth-blip.github.io/garlic-liff-scanner/gas-legacy.html
 ```text
 https://teleth-blip.github.io/garlic-liff-scanner/supabase/
 ```
+
+## 冷食原料 在庫管理
+
+```text
+https://teleth-blip.github.io/garlic-liff-scanner/frozen-ingredient/
+```
