@@ -112,7 +112,10 @@
             </label>
             <label>
               <span>数量</span>
-              <input id="inboundQuantity" type="number" min="0.001" step="0.001" inputmode="decimal" required>
+              <div class="input-with-unit">
+                <input id="inboundQuantity" type="number" min="0.001" step="0.001" inputmode="decimal" required>
+                <span id="inboundUnit" class="unit-suffix">単位</span>
+              </div>
             </label>
           </div>
           <label>
@@ -144,7 +147,10 @@
           <div class="two-columns">
             <label>
               <span>出庫数量</span>
-              <input id="outboundQuantity" type="number" min="0.001" step="0.001" inputmode="decimal" required>
+              <div class="input-with-unit">
+                <input id="outboundQuantity" type="number" min="0.001" step="0.001" inputmode="decimal" required>
+                <span id="outboundUnit" class="unit-suffix">単位</span>
+              </div>
             </label>
             <label>
               <span>残数</span>
@@ -228,6 +234,10 @@
             <label>
               <span>原材料名</span>
               <input id="materialName" type="text" maxlength="80" required>
+            </label>
+            <label>
+              <span>単位</span>
+              <input id="materialUnit" type="text" maxlength="20" placeholder="kg、袋、個 など" value="kg" required>
             </label>
             <label class="check-row">
               <input id="materialActive" type="checkbox" checked>

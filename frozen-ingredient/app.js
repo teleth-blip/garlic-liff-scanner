@@ -9,11 +9,11 @@
     'setupScreen', 'authScreen', 'appShell', 'setupForm', 'setupUrl', 'setupAnonKey',
     'authForm', 'loginWorkerSelect', 'loginPin', 'loginMessage', 'refreshButton', 'signOutButton',
     'syncStatus', 'workerSelect', 'inboundForm', 'inboundFridge', 'inboundMaterial', 'inboundExpiration',
-    'inboundQuantity', 'inboundNote', 'outboundForm', 'outboundFridge', 'outboundMaterial',
-    'outboundLotList', 'outboundQuantity', 'outboundAvailable', 'outboundNote', 'fridgeInventoryList',
+    'inboundQuantity', 'inboundUnit', 'inboundNote', 'outboundForm', 'outboundFridge', 'outboundMaterial',
+    'outboundLotList', 'outboundQuantity', 'outboundUnit', 'outboundAvailable', 'outboundNote', 'fridgeInventoryList',
     'materialInventoryList', 'fridgeMasterPanel', 'materialMasterPanel', 'fridgeForm', 'fridgeId',
     'fridgeName', 'fridgeNote', 'fridgeActive', 'clearFridgeForm', 'fridgeMasterList', 'materialForm',
-    'materialId', 'supplierName', 'materialName', 'materialActive', 'clearMaterialForm',
+    'materialId', 'supplierName', 'materialName', 'materialUnit', 'materialActive', 'clearMaterialForm',
     'materialMasterList', 'toast'
   ];
   const panels = {
@@ -79,6 +79,7 @@
       renderWorkers();
     });
     el.inboundForm.addEventListener('submit', inbound);
+    el.inboundMaterial.addEventListener('change', renderUnits);
     el.outboundForm.addEventListener('submit', outbound);
     el.outboundFridge.addEventListener('change', () => {
       state.selectedLotId = '';
@@ -87,6 +88,7 @@
     el.outboundMaterial.addEventListener('change', () => {
       state.selectedLotId = '';
       renderOutboundLots();
+      renderUnits();
     });
     el.outboundLotList.addEventListener('click', (event) => {
       const button = event.target.closest('[data-lot-id]');
@@ -278,8 +280,13 @@
   async function saveMaterial(event) {
     event.preventDefault();
     const id = el.materialId.value;
-    const values = { supplier_name: clean(el.supplierName.value), material_name: clean(el.materialName.value), is_active: el.materialActive.checked };
-    if (!values.supplier_name || !values.material_name) return;
+    const values = {
+      supplier_name: clean(el.supplierName.value),
+      material_name: clean(el.materialName.value),
+      unit_name: clean(el.materialUnit.value),
+      is_active: el.materialActive.checked
+    };
+    if (!values.supplier_name || !values.material_name || !values.unit_name) return;
     const query = id
       ? state.client.from('frozen_ingredient_materials').update(values).eq('id', id)
       : state.client.from('frozen_ingredient_materials').insert(values);
@@ -298,6 +305,7 @@
     renderMaterialInventory();
     renderMasterMode();
     renderMasterLists();
+    renderUnits();
     icons();
   }
 
@@ -323,6 +331,7 @@
     const fridgeIds = new Set(activeLots().map((lot) => lot.fridge_id));
     fillSelect(el.outboundFridge, sortName(state.fridges.filter((item) => fridgeIds.has(item.id))), (item) => item.name, '出庫できる在庫がありません');
     renderOutboundMaterials();
+    renderUnits();
   }
 
   function renderOutboundMaterials() {
@@ -330,6 +339,7 @@
     const ids = new Set(activeLots().filter((lot) => lot.fridge_id === fridgeId).map((lot) => lot.material_id));
     fillSelect(el.outboundMaterial, sortMaterials(state.materials.filter((item) => ids.has(item.id))), materialLabel, 'この冷蔵庫に在庫がありません');
     renderOutboundLots();
+    renderUnits();
   }
 
   function renderOutboundLots() {
@@ -345,14 +355,15 @@
     el.outboundLotList.innerHTML = lots.map((lot) => {
       const selected = lot.id === state.selectedLotId;
       const exp = expiry(lot.expiration_date);
+      const material = materialFor(lot);
       return `<button class="lot-choice ${selected ? 'selected' : ''}" type="button" data-lot-id="${esc(lot.id)}">
         <span>${esc(date(lot.expiration_date))}</span>
-        <strong>${qty(lot.quantity)}</strong>
+        <strong>${esc(qtyUnit(lot.quantity, material))}</strong>
         <small class="${exp.className}">${esc(exp.label)}</small>
       </button>`;
     }).join('');
     const lot = lots.find((item) => item.id === state.selectedLotId);
-    el.outboundAvailable.value = lot ? qty(lot.quantity) : '';
+    el.outboundAvailable.value = lot ? qtyUnit(lot.quantity, materialFor(lot)) : '';
   }
 
   function renderFridgeInventory() {
@@ -360,10 +371,9 @@
     el.fridgeInventoryList.innerHTML = sortName(state.fridges).map((fridge) => {
       const lots = groups.get(fridge.id) || [];
       if (!lots.length) return '';
-      const total = sum(lots);
       const rows = lots.map((lot) => stockRow(lot, 'fridge')).join('');
       return `<article class="inventory-group">
-        <div class="group-header"><h3>${esc(fridge.name)}</h3><div class="quantity">${qty(total)}</div></div>
+        <div class="group-header"><h3>${esc(fridge.name)}</h3><div class="quantity">${esc(fridgeSummary(lots))}</div></div>
         ${rows}
       </article>`;
     }).join('') || '<div class="empty-row">在庫がありません。</div>';
@@ -376,7 +386,7 @@
       if (!lots.length) return '';
       const rows = lots.map((lot) => stockRow(lot, 'material')).join('');
       return `<article class="inventory-group">
-        <div class="group-header"><div><h3>${esc(material.material_name)}</h3><div class="stock-sub">${esc(material.supplier_name)}</div></div><div class="quantity">${qty(sum(lots))}</div></div>
+        <div class="group-header"><div><h3>${esc(material.material_name)}</h3><div class="stock-sub">${esc(materialMeta(material))}</div></div><div class="quantity">${esc(qtyUnit(sum(lots), material))}</div></div>
         ${rows}
       </article>`;
     }).join('') || '<div class="empty-row">在庫がありません。</div>';
@@ -384,15 +394,16 @@
 
   function stockRow(lot, mode) {
     const exp = expiry(lot.expiration_date);
-    const title = mode === 'fridge' ? materialName(lot.material) : lot.fridge ? lot.fridge.name : '冷蔵庫不明';
-    const sub = mode === 'fridge' && lot.material ? lot.material.supplier_name : '';
+    const material = materialFor(lot);
+    const title = mode === 'fridge' ? materialName(material) : lot.fridge ? lot.fridge.name : '冷蔵庫不明';
+    const sub = mode === 'fridge' ? materialMeta(material) : '';
     return `<div class="stock-row">
       <div>
         <div class="stock-title">${esc(title)}</div>
         <div class="stock-sub">${esc(sub)}</div>
         <div class="stock-meta"><span class="date-pill ${exp.className}">${esc(date(lot.expiration_date))}</span><span class="date-pill ${exp.className}">${esc(exp.label)}</span></div>
       </div>
-      <div class="quantity">${qty(lot.quantity)}</div>
+      <div class="quantity">${esc(qtyUnit(lot.quantity, material))}</div>
     </div>`;
   }
 
@@ -404,7 +415,7 @@
 
   function renderMasterLists() {
     el.fridgeMasterList.innerHTML = sortName(state.fridges).map((fridge) => masterItem(fridge.name, fridge.note, fridge.is_active, 'fridge', fridge.id)).join('') || '<div class="empty-row">冷蔵庫が未登録です。</div>';
-    el.materialMasterList.innerHTML = sortMaterials(state.materials).map((material) => masterItem(material.material_name, material.supplier_name, material.is_active, 'material', material.id)).join('') || '<div class="empty-row">原料が未登録です。</div>';
+    el.materialMasterList.innerHTML = sortMaterials(state.materials).map((material) => masterItem(material.material_name, materialMeta(material), material.is_active, 'material', material.id)).join('') || '<div class="empty-row">原料が未登録です。</div>';
   }
 
   function masterItem(title, sub, active, kind, id) {
@@ -476,6 +487,7 @@
     el.materialId.value = material.id;
     el.supplierName.value = material.supplier_name || '';
     el.materialName.value = material.material_name || '';
+    el.materialUnit.value = material.unit_name || 'kg';
     el.materialActive.checked = Boolean(material.is_active);
     el.supplierName.focus();
   }
@@ -491,6 +503,7 @@
     el.materialId.value = '';
     el.supplierName.value = '';
     el.materialName.value = '';
+    el.materialUnit.value = 'kg';
     el.materialActive.checked = true;
   }
 
@@ -553,13 +566,42 @@
 
   function activeWorkers() { return state.workers.filter((worker) => worker.active); }
   function activeLots() { return state.lots.filter((lot) => Number(lot.quantity) > 0); }
-  function materialLabel(material) { return `${material.supplier_name} / ${material.material_name}`; }
+  function renderUnits() {
+    const inboundMaterial = state.materials.find((item) => item.id === el.inboundMaterial.value);
+    const outboundMaterial = state.materials.find((item) => item.id === el.outboundMaterial.value);
+    el.inboundUnit.textContent = unitName(inboundMaterial) || '単位';
+    el.outboundUnit.textContent = unitName(outboundMaterial) || '単位';
+  }
+  function materialFor(lot) {
+    return state.materials.find((item) => item.id === lot.material_id) || lot.material || null;
+  }
+  function materialLabel(material) {
+    const unit = unitName(material);
+    return `${material.supplier_name} / ${material.material_name}${unit ? `（${unit}）` : ''}`;
+  }
   function materialName(material) { return material ? material.material_name : '原料不明'; }
+  function materialMeta(material) {
+    if (!material) return '';
+    const unit = unitName(material);
+    return unit ? `${material.supplier_name} / ${unit}` : material.supplier_name;
+  }
+  function unitName(material) {
+    return clean(material && material.unit_name);
+  }
+  function qtyUnit(value, material) {
+    const unit = unitName(material);
+    return unit ? `${qty(value)} ${unit}` : qty(value);
+  }
+  function fridgeSummary(lots) {
+    const units = new Set(lots.map((lot) => unitName(materialFor(lot))).filter(Boolean));
+    if (units.size === 1) return qtyUnit(sum(lots), materialFor(lots[0]));
+    return `${lots.length}ロット`;
+  }
   function sortName(items) { return [...items].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ja')); }
   function sortMaterials(items) {
     return [...items].sort((a, b) => String(a.supplier_name || '').localeCompare(String(b.supplier_name || ''), 'ja') || String(a.material_name || '').localeCompare(String(b.material_name || ''), 'ja'));
   }
-  function compareLotsForFridge(a, b) { return a.expiration_date.localeCompare(b.expiration_date) || materialName(a.material).localeCompare(materialName(b.material), 'ja'); }
+  function compareLotsForFridge(a, b) { return a.expiration_date.localeCompare(b.expiration_date) || materialName(materialFor(a)).localeCompare(materialName(materialFor(b)), 'ja'); }
   function compareLotsForMaterial(a, b) {
     return a.expiration_date.localeCompare(b.expiration_date) || String(a.fridge && a.fridge.name || '').localeCompare(String(b.fridge && b.fridge.name || ''), 'ja');
   }

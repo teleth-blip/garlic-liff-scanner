@@ -12,7 +12,7 @@
   --gold: #b98418;
   --danger: #b33f4a;
   --danger-soft: #fae5e8;
-  --shadow: 0 10px 30px rgba(21, 33, 29, 0.08);
+  --shadow: 0 6px 18px rgba(21, 33, 29, 0.07);
 }
 
 * {
@@ -63,29 +63,29 @@ select:disabled {
   width: min(100%, 520px);
   min-height: 100svh;
   margin: 0 auto;
-  padding: 28px 18px;
+  padding: 20px 14px;
 }
 
 .compact-screen {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 24px;
+  gap: 16px;
 }
 
 .brand,
 .section-title {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 9px;
 }
 
 .brand-mark {
   display: grid;
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   place-items: center;
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--accent-soft);
   color: var(--accent-dark);
   box-shadow: inset 0 0 0 1px rgba(15, 143, 125, 0.14);
@@ -94,8 +94,8 @@ select:disabled {
 .brand-mark svg,
 .section-title svg,
 button svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   stroke-width: 2.2;
 }
 
@@ -107,22 +107,22 @@ button svg {
 }
 
 .brand h1 {
-  font-size: 2rem;
+  font-size: 1.65rem;
 }
 
 .app-header h1 {
-  font-size: 1.35rem;
+  font-size: 1.12rem;
 }
 
 .section-title h2 {
-  font-size: 1.24rem;
+  font-size: 1.06rem;
 }
 
 .eyebrow,
 .label-text {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -131,7 +131,7 @@ button svg {
 .stack,
 .work-form {
   display: grid;
-  gap: 14px;
+  gap: 8px;
 }
 
 .work-form,
@@ -147,29 +147,29 @@ button svg {
 
 .work-form,
 .account-strip {
-  padding: 16px;
+  padding: 10px;
 }
 
 label {
   display: grid;
-  gap: 7px;
+  gap: 4px;
 }
 
 label > span {
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
 input,
 select {
   width: 100%;
-  min-height: 48px;
+  min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
   color: var(--text);
-  padding: 11px 12px;
+  padding: 8px 10px;
   outline: none;
 }
 
@@ -184,10 +184,33 @@ input[readonly] {
   color: var(--muted);
 }
 
+.input-with-unit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.unit-suffix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
 .two-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: 8px;
 }
 
 .button-row,
@@ -195,7 +218,7 @@ input[readonly] {
 .inline-form {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
 }
 
 .primary,
@@ -205,7 +228,7 @@ input[readonly] {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 46px;
+  min-height: 40px;
   border-radius: 8px;
   font-weight: 800;
 }
@@ -249,7 +272,7 @@ input[readonly] {
   width: min(100%, 760px);
   min-height: 100svh;
   margin: 0 auto;
-  padding: 0 14px calc(94px + env(safe-area-inset-bottom));
+  padding: 0 10px calc(76px + env(safe-area-inset-bottom));
 }
 
 .app-header {
@@ -259,9 +282,9 @@ input[readonly] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  margin: 0 -14px;
-  padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+  gap: 10px;
+  margin: 0 -10px;
+  padding: calc(8px + env(safe-area-inset-top)) 10px 8px;
   background: rgba(247, 249, 248, 0.94);
   border-bottom: 1px solid rgba(216, 225, 221, 0.7);
   backdrop-filter: blur(12px);
@@ -271,19 +294,19 @@ input[readonly] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 12px 0 14px;
+  gap: 8px;
+  padding: 7px 0 8px;
 }
 
 .status-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 26px;
+  padding: 0 8px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-dark);
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 800;
 }
 
@@ -306,7 +329,7 @@ input[readonly] {
   display: grid;
   grid-template-columns: auto minmax(108px, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   min-width: 0;
   max-width: 230px;
 }
@@ -319,35 +342,35 @@ input[readonly] {
 }
 
 .worker-switch select {
-  min-height: 36px;
-  padding: 6px 8px;
-  font-size: 0.84rem;
+  min-height: 32px;
+  padding: 4px 7px;
+  font-size: 0.78rem;
 }
 
 .login-message {
-  min-height: 20px;
+  min-height: 18px;
   color: var(--danger);
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 800;
 }
 
 .tab-panel {
   display: grid;
-  gap: 14px;
+  gap: 8px;
 }
 
 .segmented {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding: 5px;
+  gap: 4px;
+  padding: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #eef2f0;
 }
 
 .segmented button {
-  min-height: 40px;
+  min-height: 34px;
   border-radius: 7px;
   background: transparent;
   color: var(--muted);
@@ -363,7 +386,7 @@ input[readonly] {
 .check-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 7px;
 }
 
 .check-row input {
@@ -380,12 +403,12 @@ input[readonly] {
 .inventory-list,
 .master-list {
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
 .lot-choice {
   width: 100%;
-  padding: 12px;
+  padding: 8px 10px;
   color: var(--text);
   text-align: left;
 }
@@ -402,7 +425,7 @@ input[readonly] {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .lot-title,
@@ -416,7 +439,7 @@ input[readonly] {
 .master-sub,
 .empty-row {
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
 }
 
 .quantity {
@@ -430,18 +453,18 @@ input[readonly] {
 }
 
 .group-header {
-  padding: 13px 14px;
+  padding: 8px 10px;
   background: var(--surface-strong);
   border-bottom: 1px solid var(--line);
 }
 
 .group-header h3 {
-  margin: 0 0 3px;
-  font-size: 1rem;
+  margin: 0 0 1px;
+  font-size: 0.92rem;
 }
 
 .stock-row {
-  padding: 12px 14px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -452,18 +475,18 @@ input[readonly] {
 .stock-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 7px;
+  gap: 4px;
+  margin-top: 5px;
 }
 
 .date-pill,
 .state-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
+  min-height: 22px;
   border-radius: 999px;
-  padding: 0 9px;
-  font-size: 0.76rem;
+  padding: 0 7px;
+  font-size: 0.7rem;
   font-weight: 850;
 }
 
@@ -498,20 +521,20 @@ input[readonly] {
 }
 
 .empty-row {
-  padding: 14px;
+  padding: 10px;
 }
 
 .master-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px 10px;
 }
 
 .master-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 
@@ -536,7 +559,7 @@ input[readonly] {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 2px;
   margin: 0 auto;
-  padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+  padding: 5px 6px calc(5px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid var(--line);
   box-shadow: 0 -10px 24px rgba(21, 33, 29, 0.08);
@@ -545,13 +568,13 @@ input[readonly] {
 
 .bottom-tabs button {
   display: grid;
-  min-height: 58px;
+  min-height: 48px;
   place-items: center;
-  gap: 3px;
+  gap: 1px;
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 800;
 }
 
@@ -563,7 +586,7 @@ input[readonly] {
 .toast {
   position: fixed;
   right: 14px;
-  bottom: calc(88px + env(safe-area-inset-bottom));
+  bottom: calc(72px + env(safe-area-inset-bottom));
   left: 14px;
   z-index: 60;
   max-width: 720px;
