@@ -770,8 +770,10 @@
     .label-sheet {
       display: grid;
       grid-template-columns: repeat(2, 120mm);
+      column-gap: 10mm;
+      row-gap: 0;
       grid-template-rows: repeat(3, 63mm);
-      width: 240mm;
+      width: 250mm;
       min-height: 189mm;
       margin: 14px auto;
       background: #fff;
@@ -863,7 +865,7 @@
         border: none;
       }
       .label-sheet {
-        margin: 10.5mm 28.5mm;
+        margin: 10.5mm 23.5mm;
         page-break-after: always;
       }
       .qr-label {
@@ -976,7 +978,6 @@
     </section>
 
     <section id="qrPanel" class="panel hidden" data-panel="qr">
-      <div class="panel-note muted">標準カメラ用QR / A-one 72206 / A4横 / 2列3行</div>
       <div class="qr-pick-grid">
         <label class="pallet-pick-field">左列パレット番号
           <input id="qrLeftNo" autocomplete="off">
