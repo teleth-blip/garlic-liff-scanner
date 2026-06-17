@@ -804,6 +804,13 @@
       width: 100%;
       height: 100%;
       padding: 6mm;
+      border: none;
+    }
+    .label-sheet.layout-six .qr-label:nth-child(odd) {
+      border-right: 0.25mm dashed #777;
+    }
+    .label-sheet.layout-six .qr-label:nth-child(-n + 4) {
+      border-bottom: 0.25mm dashed #777;
     }
     .qr-code svg {
       width: 47mm;
