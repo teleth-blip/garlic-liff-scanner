@@ -377,13 +377,6 @@ input[readonly] {
 }
 
 .lot-choice-list,
-inventory-list,
-.master-list {
-  display: grid;
-  gap: 10px;
-}
-
-.lot-choice-list,
 .inventory-list,
 .master-list {
   display: grid;
