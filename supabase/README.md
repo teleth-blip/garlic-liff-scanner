@@ -1,6 +1,6 @@
 # Supabase版 準備手順
 
-このフォルダは、既存のGoogleスプレッドシート版を残したまま、Supabase版を並行して準備するためのものです。
+このフォルダは、GitHub Pages上の正式版UIから使うSupabase DBを準備・更新するためのものです。
 
 ## 1. テーブル作成
 
@@ -98,12 +98,6 @@ https://teleth-blip.github.io/garlic-liff-scanner/
 
 ```text
 https://teleth-blip.github.io/garlic-liff-scanner/
-```
-
-旧GAS版:
-
-```text
-https://teleth-blip.github.io/garlic-liff-scanner/gas-legacy.html
 ```
 
 Supabase版準備確認:
