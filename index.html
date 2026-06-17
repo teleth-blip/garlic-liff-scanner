@@ -785,8 +785,7 @@
       grid-template-rows: repeat(3, minmax(0, 1fr));
       width: 297mm;
       height: 210mm;
-      padding: 6mm;
-      place-items: center;
+      padding: 0;
     }
     .qr-label {
       width: 120mm;
@@ -801,6 +800,11 @@
       break-inside: avoid;
     }
     .qr-label.blank { border-color: transparent; }
+    .label-sheet.layout-six .qr-label {
+      width: 100%;
+      height: 100%;
+      padding: 6mm;
+    }
     .qr-code svg {
       width: 47mm;
       height: 47mm;
@@ -884,7 +888,7 @@
         width: 297mm;
         height: 210mm;
         margin: 0;
-        padding: 6mm;
+        padding: 0;
       }
       .qr-label {
         border: none;
