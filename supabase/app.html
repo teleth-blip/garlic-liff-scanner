@@ -769,14 +769,24 @@
     }
     .label-sheet {
       display: grid;
+      margin: 14px auto;
+      background: #fff;
+    }
+    .label-sheet.layout-aone {
       grid-template-columns: repeat(2, 120mm);
       column-gap: 10mm;
       row-gap: 0;
       grid-template-rows: repeat(3, 63mm);
       width: 250mm;
       min-height: 189mm;
-      margin: 14px auto;
-      background: #fff;
+    }
+    .label-sheet.layout-six {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(3, minmax(0, 1fr));
+      width: 297mm;
+      height: 210mm;
+      padding: 6mm;
+      place-items: center;
     }
     .qr-label {
       width: 120mm;
@@ -854,7 +864,7 @@
     @media print {
       @page { size: A4 landscape; margin: 0; }
       body { background: #fff; }
-      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast {
+      .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .panel-note, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast {
         display: none !important;
       }
       main { width: 297mm; padding: 0; }
@@ -865,8 +875,16 @@
         border: none;
       }
       .label-sheet {
-        margin: 10.5mm 23.5mm;
         page-break-after: always;
+      }
+      .label-sheet.layout-aone {
+        margin: 10.5mm 23.5mm;
+      }
+      .label-sheet.layout-six {
+        width: 297mm;
+        height: 210mm;
+        margin: 0;
+        padding: 6mm;
       }
       .qr-label {
         border: none;
@@ -978,6 +996,7 @@
     </section>
 
     <section id="qrPanel" class="panel hidden" data-panel="qr">
+      <div class="panel-note muted">標準カメラ用QR / A-one 72206 / A4横 / 2列3行</div>
       <div class="qr-pick-grid">
         <label class="pallet-pick-field">左列パレット番号
           <input id="qrLeftNo" autocomplete="off">
@@ -987,12 +1006,18 @@
           <input id="qrRightNo" autocomplete="off">
           <div class="pallet-suggestions hidden" data-pallet-suggestions></div>
         </label>
+        <label>印刷配置
+          <select id="qrLayoutMode">
+            <option value="aone">A-one 72206</option>
+            <option value="six">印刷余白考慮 6等分（余白6mm）</option>
+          </select>
+        </label>
       </div>
       <div class="action-row">
         <button type="button" id="clearQrBtn" class="secondary">入力クリア</button>
         <button type="button" id="printBtn">印刷</button>
       </div>
-      <div id="printArea" class="label-sheet"></div>
+      <div id="printArea" class="label-sheet layout-aone"></div>
     </section>
 
     <section id="inboundPanel" class="panel hidden" data-panel="inbound">
@@ -1257,7 +1282,7 @@
       lockedPallets: { inbound: '', outbound: '', moveStart: '', moveDone: '' },
       inventorySelectedPalletNo: '',
       busy: false,
-      qrPrint: { left: '', right: '' },
+      qrPrint: { left: '', right: '', layout: localStorage.getItem('garlic.qrLayout') || 'aone' },
       masterDraftKey: '',
       masterUnavailable: new Set(),
       apiBridge: {
@@ -1332,6 +1357,11 @@
         state.qrPrint.right = $('qrRightNo').value.trim();
         renderPrintArea();
         renderPalletSuggestions('qrRightNo', 'right');
+      });
+      $('qrLayoutMode').addEventListener('change', () => {
+        state.qrPrint.layout = $('qrLayoutMode').value === 'six' ? 'six' : 'aone';
+        localStorage.setItem('garlic.qrLayout', state.qrPrint.layout);
+        renderPrintArea();
       });
       $('clearQrBtn').addEventListener('click', () => {
         state.qrPrint.left = '';
@@ -2068,11 +2098,14 @@
     function renderPrintArea() {
       const left = findPallet(state.qrPrint.left || $('qrLeftNo').value);
       const right = findPallet(state.qrPrint.right || $('qrRightNo').value);
+      const layout = state.qrPrint.layout === 'six' ? 'six' : 'aone';
       const labels = [];
       for (let row = 0; row < 3; row++) {
         labels.push(left ? qrLabelHtml(left) : '<div class="qr-label blank"></div>');
         labels.push(right ? qrLabelHtml(right) : '<div class="qr-label blank"></div>');
       }
+      $('qrLayoutMode').value = layout;
+      $('printArea').className = `label-sheet layout-${layout}`;
       $('printArea').innerHTML = labels.join('');
     }
 
