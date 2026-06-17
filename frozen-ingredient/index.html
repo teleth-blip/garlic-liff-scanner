@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f9f8">
+  <title>冷食原料 在庫管理</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="./config.js"></script>
+</head>
+<body>
+  <main class="page">
+    <section id="setupScreen" class="screen compact-screen hidden">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <i data-lucide="snowflake"></i>
+        </div>
+        <div>
+          <p class="eyebrow">Supabase</p>
+          <h1>接続設定</h1>
+        </div>
+      </div>
+
+      <form id="setupForm" class="stack">
+        <label>
+          <span>Project URL</span>
+          <input id="setupUrl" type="url" autocomplete="off" placeholder="https://xxxxxxxx.supabase.co" required>
+        </label>
+        <label>
+          <span>Anon key</span>
+          <input id="setupAnonKey" type="password" autocomplete="off" required>
+        </label>
+        <button class="primary" type="submit">
+          <i data-lucide="plug-zap"></i>
+          接続
+        </button>
+      </form>
+    </section>
+
+    <section id="authScreen" class="screen compact-screen hidden">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <i data-lucide="package-check"></i>
+        </div>
+        <div>
+          <p class="eyebrow">冷食原料</p>
+          <h1>在庫管理</h1>
+        </div>
+      </div>
+
+      <form id="authForm" class="stack">
+        <label>
+          <span>作業者</span>
+          <select id="loginWorkerSelect" required></select>
+        </label>
+        <label>
+          <span>PIN</span>
+          <input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="必須" required>
+        </label>
+        <button id="authSubmit" class="primary" type="submit">
+          <i data-lucide="log-in"></i>
+          ログイン
+        </button>
+        <div id="loginMessage" class="login-message"></div>
+      </form>
+    </section>
+
+    <section id="appShell" class="app-shell hidden">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">冷食原料</p>
+          <h1>在庫管理</h1>
+        </div>
+        <div class="header-actions">
+          <button id="refreshButton" class="icon-button" type="button" aria-label="更新" title="更新">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+          <button id="signOutButton" class="icon-button" type="button" aria-label="ログアウト" title="ログアウト">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="status-row">
+        <span id="syncStatus" class="status-pill">接続中</span>
+        <label class="worker-switch">
+          <span>作業者</span>
+          <select id="workerSelect"></select>
+        </label>
+      </div>
+
+      <section id="tabInbound" class="tab-panel">
+        <div class="section-title">
+          <i data-lucide="arrow-down-to-line"></i>
+          <h2>入庫</h2>
+        </div>
+        <form id="inboundForm" class="work-form">
+          <label>
+            <span>保管先の冷蔵庫</span>
+            <select id="inboundFridge" required></select>
+          </label>
+          <label>
+            <span>原材料</span>
+            <select id="inboundMaterial" required></select>
+          </label>
+          <div class="two-columns">
+            <label>
+              <span>賞味期限</span>
+              <input id="inboundExpiration" type="date" required>
+            </label>
+            <label>
+              <span>数量</span>
+              <input id="inboundQuantity" type="number" min="0.001" step="0.001" inputmode="decimal" required>
+            </label>
+          </div>
+          <label>
+            <span>メモ</span>
+            <input id="inboundNote" type="text" maxlength="120" autocomplete="off">
+          </label>
+          <button class="primary" type="submit">
+            <i data-lucide="save"></i>
+            入庫を登録
+          </button>
+        </form>
+      </section>
+
+      <section id="tabOutbound" class="tab-panel hidden">
+        <div class="section-title">
+          <i data-lucide="arrow-up-from-line"></i>
+          <h2>出庫</h2>
+        </div>
+        <form id="outboundForm" class="work-form">
+          <label>
+            <span>保管先の冷蔵庫</span>
+            <select id="outboundFridge" required></select>
+          </label>
+          <label>
+            <span>原材料</span>
+            <select id="outboundMaterial" required></select>
+          </label>
+          <div id="outboundLotList" class="lot-choice-list"></div>
+          <div class="two-columns">
+            <label>
+              <span>出庫数量</span>
+              <input id="outboundQuantity" type="number" min="0.001" step="0.001" inputmode="decimal" required>
+            </label>
+            <label>
+              <span>残数</span>
+              <input id="outboundAvailable" type="text" readonly>
+            </label>
+          </div>
+          <label>
+            <span>メモ</span>
+            <input id="outboundNote" type="text" maxlength="120" autocomplete="off">
+          </label>
+          <button class="primary danger-action" type="submit">
+            <i data-lucide="save"></i>
+            出庫を登録
+          </button>
+        </form>
+      </section>
+
+      <section id="tabFridges" class="tab-panel hidden">
+        <div class="section-title">
+          <i data-lucide="warehouse"></i>
+          <h2>冷蔵庫別</h2>
+        </div>
+        <div id="fridgeInventoryList" class="inventory-list"></div>
+      </section>
+
+      <section id="tabMaterials" class="tab-panel hidden">
+        <div class="section-title">
+          <i data-lucide="boxes"></i>
+          <h2>原料別</h2>
+        </div>
+        <div id="materialInventoryList" class="inventory-list"></div>
+      </section>
+
+      <section id="tabMaster" class="tab-panel hidden">
+        <div class="section-title">
+          <i data-lucide="settings-2"></i>
+          <h2>マスタ管理</h2>
+        </div>
+
+        <div class="segmented" role="tablist" aria-label="マスタ種別">
+          <button class="active" type="button" data-master-mode="fridges">冷蔵庫</button>
+          <button type="button" data-master-mode="materials">原料</button>
+        </div>
+
+        <div id="fridgeMasterPanel">
+          <form id="fridgeForm" class="work-form">
+            <input id="fridgeId" type="hidden">
+            <label>
+              <span>冷蔵庫名</span>
+              <input id="fridgeName" type="text" maxlength="60" required>
+            </label>
+            <label>
+              <span>メモ</span>
+              <input id="fridgeNote" type="text" maxlength="120">
+            </label>
+            <label class="check-row">
+              <input id="fridgeActive" type="checkbox" checked>
+              <span>使用中</span>
+            </label>
+            <div class="button-row">
+              <button class="primary" type="submit">
+                <i data-lucide="save"></i>
+                保存
+              </button>
+              <button id="clearFridgeForm" class="secondary" type="button">
+                <i data-lucide="plus"></i>
+                新規
+              </button>
+            </div>
+          </form>
+          <div id="fridgeMasterList" class="master-list"></div>
+        </div>
+
+        <div id="materialMasterPanel" class="hidden">
+          <form id="materialForm" class="work-form">
+            <input id="materialId" type="hidden">
+            <label>
+              <span>仕入先名</span>
+              <input id="supplierName" type="text" maxlength="80" required>
+            </label>
+            <label>
+              <span>原材料名</span>
+              <input id="materialName" type="text" maxlength="80" required>
+            </label>
+            <label class="check-row">
+              <input id="materialActive" type="checkbox" checked>
+              <span>使用中</span>
+            </label>
+            <div class="button-row">
+              <button class="primary" type="submit">
+                <i data-lucide="save"></i>
+                保存
+              </button>
+              <button id="clearMaterialForm" class="secondary" type="button">
+                <i data-lucide="plus"></i>
+                新規
+              </button>
+            </div>
+          </form>
+          <div id="materialMasterList" class="master-list"></div>
+        </div>
+      </section>
+
+      <nav class="bottom-tabs" aria-label="主要メニュー">
+        <button class="active" type="button" data-tab="inbound">
+          <i data-lucide="arrow-down-to-line"></i>
+          <span>入庫</span>
+        </button>
+        <button type="button" data-tab="outbound">
+          <i data-lucide="arrow-up-from-line"></i>
+          <span>出庫</span>
+        </button>
+        <button type="button" data-tab="fridges">
+          <i data-lucide="warehouse"></i>
+          <span>冷蔵庫</span>
+        </button>
+        <button type="button" data-tab="materials">
+          <i data-lucide="boxes"></i>
+          <span>原料</span>
+        </button>
+        <button type="button" data-tab="master">
+          <i data-lucide="settings-2"></i>
+          <span>マスタ</span>
+        </button>
+      </nav>
+    </section>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
