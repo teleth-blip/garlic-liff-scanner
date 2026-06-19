@@ -6,6 +6,7 @@
   <title>にんにく冷蔵庫管理</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     :root {
       --bg: #f3f6f4;
@@ -21,6 +22,7 @@
       --disabled: #e5e7eb;
       --used: #d9eee6;
       --selected: #f7d56b;
+      --shadow: 0 6px 18px rgba(23, 33, 27, .07);
       color-scheme: light;
     }
     * { box-sizing: border-box; }
@@ -29,7 +31,7 @@
       width: 100%;
       overflow-x: hidden;
       color: var(--ink);
-      background: var(--bg);
+      background: linear-gradient(180deg, #f9fbfa 0%, var(--bg) 48%, #eef3ef 100%);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.45;
     }
@@ -37,15 +39,17 @@
       position: sticky;
       top: 0;
       z-index: 20;
-      padding: 8px;
-      background: #fff;
-      border-bottom: 1px solid var(--line);
+      padding: calc(8px + env(safe-area-inset-top)) 8px 8px;
+      background: rgba(249, 251, 250, .94);
+      border-bottom: 1px solid rgba(216, 224, 218, .78);
+      backdrop-filter: blur(12px);
     }
     .header-row {
       display: flex;
       align-items: center;
       gap: 6px;
-      max-width: none;
+      width: min(100%, 1180px);
+      max-width: 1180px;
       margin: 0 auto;
       min-width: 0;
     }
@@ -84,10 +88,19 @@
       font-size: 13px;
     }
     .header-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
       min-height: 36px;
       padding: 7px 9px;
       font-size: 12px;
       white-space: nowrap;
+    }
+    button svg {
+      width: 17px;
+      height: 17px;
+      stroke-width: 2.3;
     }
     body.login-locked .app-header,
     body.login-locked main {
@@ -128,7 +141,7 @@
     }
     @media (max-width: 420px) {
       .app-header {
-        padding: 6px;
+        padding: calc(6px + env(safe-area-inset-top)) 6px 6px;
       }
       .header-row {
         gap: 5px;
@@ -152,38 +165,60 @@
         font-size: 12px;
       }
       .header-btn {
+        width: 34px;
         min-height: 34px;
-        padding: 5px 6px;
+        padding: 5px;
         font-size: 11px;
+      }
+      .header-btn span {
+        display: none;
       }
     }
     main {
       width: 100%;
       max-width: none;
       margin: 0 auto;
-      padding: 8px;
+      padding: 8px 8px calc(118px + env(safe-area-inset-bottom));
     }
     .tabs {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding: 4px 0 10px;
-      -webkit-overflow-scrolling: touch;
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 30;
+      display: grid;
+      width: min(100%, 900px);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 2px;
+      margin: 0 auto;
+      padding: 5px 6px calc(5px + env(safe-area-inset-bottom));
+      overflow: visible;
+      background: rgba(255, 255, 255, .96);
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -10px 24px rgba(23, 33, 27, .08);
+      backdrop-filter: blur(12px);
     }
     .tab {
-      flex: 0 0 auto;
-      min-height: 44px;
-      padding: 10px 14px;
-      border: 1px solid var(--line);
+      display: grid;
+      min-height: 48px;
+      place-items: center;
+      gap: 1px;
+      padding: 5px 2px;
+      border: 0;
       border-radius: 8px;
-      background: #fff;
-      color: var(--ink);
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
       font-weight: 800;
+      line-height: 1.1;
+    }
+    .tab svg {
+      width: 18px;
+      height: 18px;
     }
     .tab.active {
-      color: #fff;
-      background: var(--brand);
-      border-color: var(--brand);
+      color: var(--brand-dark);
+      background: var(--soft);
     }
     .sub-tabs {
       display: grid;
@@ -855,6 +890,9 @@
     }
     .detail-mini th { background: #f2f2f2; }
     @media (min-width: 780px) {
+      .tabs {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+      }
       .header-row {
         grid-template-columns: 1fr minmax(360px, 460px);
         align-items: center;
@@ -927,8 +965,8 @@
         <label class="worker-select-label"><span>作業者</span>
           <select id="workerSelect"></select>
         </label>
-        <button type="button" id="reloadBtn" class="secondary header-btn">更新</button>
-        <button type="button" id="logoutBtn" class="secondary header-btn">ログアウト</button>
+        <button type="button" id="reloadBtn" class="secondary header-btn"><i data-lucide="refresh-cw"></i><span>更新</span></button>
+        <button type="button" id="logoutBtn" class="secondary header-btn"><i data-lucide="log-out"></i><span>ログアウト</span></button>
       </div>
     </div>
   </header>
@@ -948,17 +986,17 @@
     </section>
 
     <nav class="tabs" aria-label="機能">
-      <button type="button" class="tab active" data-tab="register">登録</button>
-      <button type="button" class="tab" data-tab="qr">QR印刷</button>
-      <button type="button" class="tab" data-tab="inbound">入庫</button>
-      <button type="button" class="tab" data-tab="outbound">出庫</button>
-      <button type="button" class="tab" data-tab="move">移動</button>
-      <button type="button" class="tab" data-tab="inventory">配置確認</button>
-      <button type="button" class="tab" data-tab="search">検索</button>
-      <button type="button" class="tab" data-tab="master">マスタ</button>
+      <button type="button" class="tab active" data-tab="inbound"><i data-lucide="arrow-down-to-line"></i><span>入庫</span></button>
+      <button type="button" class="tab" data-tab="outbound"><i data-lucide="arrow-up-from-line"></i><span>出庫</span></button>
+      <button type="button" class="tab" data-tab="move"><i data-lucide="move-right"></i><span>移動</span></button>
+      <button type="button" class="tab" data-tab="inventory"><i data-lucide="layout-grid"></i><span>配置確認</span></button>
+      <button type="button" class="tab" data-tab="search"><i data-lucide="search"></i><span>検索</span></button>
+      <button type="button" class="tab" data-tab="register"><i data-lucide="package-plus"></i><span>登録</span></button>
+      <button type="button" class="tab" data-tab="qr"><i data-lucide="qr-code"></i><span>QR印刷</span></button>
+      <button type="button" class="tab" data-tab="master"><i data-lucide="settings-2"></i><span>マスタ</span></button>
     </nav>
 
-    <section id="registerPanel" class="panel" data-panel="register">
+    <section id="registerPanel" class="panel hidden" data-panel="register">
       <div class="action-row">
         <span id="registerTitle" class="hidden">パレット登録</span>
         <button type="button" id="clearRegisterBtn" class="secondary small">入力クリア</button>
@@ -1031,7 +1069,7 @@
       <div id="printArea" class="label-sheet layout-aone"></div>
     </section>
 
-    <section id="inboundPanel" class="panel hidden" data-panel="inbound">
+    <section id="inboundPanel" class="panel" data-panel="inbound">
       <div class="operation-row">
         <label>冷蔵庫
           <select id="inCooler"></select>
@@ -1286,7 +1324,7 @@
       workers: [],
       workerId: localStorage.getItem('garlic.workerId') || '',
       loggedIn: false,
-      tab: 'register',
+      tab: 'inbound',
       moveMode: 'start',
       editPalletNo: '',
       selectedLocations: { inbound: '', outbound: '', moveStart: '', move: '' },
@@ -1315,6 +1353,7 @@
 
     async function init() {
       bindEvents();
+      renderIcons();
       setDefaultYear();
       if (state.launch.palletNo) {
         $('launchPanel').classList.remove('hidden');
@@ -1527,6 +1566,12 @@
       state.tab = tab;
       document.querySelectorAll('[data-tab]').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
       document.querySelectorAll('[data-panel]').forEach(panel => panel.classList.toggle('hidden', panel.dataset.panel !== tab));
+    }
+
+    function renderIcons() {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
     }
 
     function setMoveMode(mode) {
