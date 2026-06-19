@@ -619,6 +619,13 @@
       gap: 8px;
       margin-top: 12px;
     }
+    .search-controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(140px, 180px);
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 10px;
+    }
     .search-groups {
       display: grid;
       gap: 8px;
@@ -703,6 +710,9 @@
     @media (max-width: 720px) {
       .search-group > summary {
         grid-template-columns: 1fr 1fr;
+      }
+      .search-controls {
+        grid-template-columns: 1fr;
       }
       .search-group > summary::after {
         grid-column: 2;
@@ -1211,9 +1221,18 @@
     </section>
 
     <section id="searchPanel" class="panel hidden" data-panel="search">
-      <div class="operation-row">
+      <div class="search-controls">
         <label>検索
           <input id="searchQuery" autocomplete="off" placeholder="生産者・規格・冷蔵庫・パレット番号">
+        </label>
+        <label>状態
+          <select id="searchStatus">
+            <option value="">すべて</option>
+            <option value="未配置">未配置</option>
+            <option value="保管中">保管中</option>
+            <option value="仮移動中">仮移動中</option>
+            <option value="出庫済">出庫済</option>
+          </select>
         </label>
       </div>
       <div class="search-section">
@@ -1445,6 +1464,7 @@
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
       $('searchQuery').addEventListener('input', renderSearch);
+      $('searchStatus').addEventListener('change', renderSearch);
       $('addStandardBtn').addEventListener('click', addStandardRow);
       $('saveStandardsBtn').addEventListener('click', () => withBusy('saveStandardsBtn', '保存中...', saveStandards));
       $('addCoolerBtn').addEventListener('click', addCoolerRow);
@@ -2592,6 +2612,7 @@
 
     function searchDetailRows() {
       const query = cleanText($('searchQuery').value).toLowerCase();
+      const status = $('searchStatus').value;
       return (state.data.details || []).map(detail => {
         const pallet = findPallet(detail.palletNo) || {};
         const location = pallet.currentLocationId ? (findLocation(pallet.currentLocationId) || parseLocationId(pallet.currentLocationId)) : null;
@@ -2618,7 +2639,7 @@
           row.coolerName
         ].filter(Boolean).join(' ').toLowerCase();
         return row;
-      }).filter(row => !query || row.searchText.includes(query))
+      }).filter(row => (!status || row.palletStatus === status) && (!query || row.searchText.includes(query)))
         .sort((a, b) => a.producerText.localeCompare(b.producerText, 'ja')
           || a.standard.localeCompare(b.standard, 'ja')
           || a.palletNo.localeCompare(b.palletNo, 'ja')
