@@ -363,6 +363,15 @@
       margin-top: 10px;
       font-size: 13px;
     }
+    .producer-list-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
     .muted { color: var(--muted); }
     .panel-note {
       margin-bottom: 10px;
@@ -1250,6 +1259,20 @@
     </section>
 
     <section id="masterPanel" class="panel hidden" data-panel="master">
+      <details class="master-section" open>
+        <summary>生産者一覧</summary>
+        <div class="master-body">
+          <div id="producerListSummary" class="producer-list-summary"></div>
+          <h3>4桁 生産者（A列）</h3>
+          <div class="table-wrap">
+            <table><thead><tr><th>登録番号形式</th><th>元番号</th><th>生産者名</th></tr></thead><tbody id="producerAListRows"></tbody></table>
+          </div>
+          <h3>7桁 生産者（D列）</h3>
+          <div class="table-wrap">
+            <table><thead><tr><th>登録番号形式</th><th>元番号</th><th>生産者名</th></tr></thead><tbody id="producerDListRows"></tbody></table>
+          </div>
+        </div>
+      </details>
       <details class="master-section">
         <summary>規格マスタ</summary>
         <div class="master-body">
@@ -2790,12 +2813,43 @@
     }
 
     function renderMaster() {
+      renderProducerList();
       renderStandardRows();
       renderCoolerRows();
       renderWorkerRows();
       renderProducerSettings();
       renderHistoryRows();
       renderMasterGrid();
+    }
+
+    function renderProducerList() {
+      const producers = activeProducers();
+      const aProducers = producers.filter(p => p.producerSource !== 'D');
+      const dProducers = producers.filter(p => p.producerSource === 'D');
+      $('producerListSummary').textContent = `4桁 ${aProducers.length}件 / 7桁 ${dProducers.length}件`;
+      $('producerAListRows').innerHTML = producerListRows(aProducers, 'A');
+      $('producerDListRows').innerHTML = producerListRows(dProducers, 'D');
+    }
+
+    function producerListRows(producers, source) {
+      if (!producers.length) {
+        return '<tr><td colspan="3" class="muted">登録されていません。</td></tr>';
+      }
+      return producers.map(producer => {
+        const p = enrichProducer({ ...producer, producerSource: source });
+        return `<tr>
+          <td>${esc(producerListCode(p))}</td>
+          <td>${esc(p.producerDisplayNo)}</td>
+          <td>${esc(p.producerName || '(名称なし)')}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function producerListCode(producer) {
+      const p = enrichProducer(producer);
+      const reiwa = reiwaYearFromYear(producerCodeDate().getFullYear());
+      if (p.producerSource === 'D') return `${reiwa}MMDD${padNumber(p.producerBaseNumber, 2)}`;
+      return `${reiwa}${padNumber(p.producerBaseNumber, 3)}`;
     }
 
     function renderStandardRows() {
