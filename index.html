@@ -372,6 +372,12 @@
       font-size: 13px;
       font-weight: 800;
     }
+    .producer-list-filter {
+      margin-bottom: 10px;
+    }
+    .producer-list-filter input {
+      width: 100%;
+    }
     .muted { color: var(--muted); }
     .panel-note {
       margin-bottom: 10px;
@@ -1283,6 +1289,9 @@
         <summary>生産者一覧</summary>
         <div class="master-body">
           <div id="producerListSummary" class="producer-list-summary"></div>
+          <label class="producer-list-filter">生産者名で検索
+            <input id="producerListSearch" type="search" autocomplete="off" placeholder="名前を入力">
+          </label>
           <h3>4桁 生産者（A列）</h3>
           <div class="table-wrap producer-list-wrap">
             <table class="producer-list-table"><thead><tr><th>番号形式</th><th>生産者名</th></tr></thead><tbody id="producerAListRows"></tbody></table>
@@ -1400,6 +1409,7 @@
       qrPrint: { left: '', right: '', layout: localStorage.getItem('garlic.qrLayout') || 'aone' },
       masterDraftKey: '',
       masterUnavailable: new Set(),
+      producerListQuery: '',
       apiBridge: {
         frame: null,
         ready: false,
@@ -1508,6 +1518,10 @@
       $('searchPallet').addEventListener('input', handleInventorySearch);
       $('searchQuery').addEventListener('input', renderSearch);
       $('searchStatus').addEventListener('change', renderSearch);
+      $('producerListSearch').addEventListener('input', () => {
+        state.producerListQuery = $('producerListSearch').value.trim();
+        renderProducerList();
+      });
       $('addStandardBtn').addEventListener('click', addStandardRow);
       $('saveStandardsBtn').addEventListener('click', () => withBusy('saveStandardsBtn', '保存中...', saveStandards));
       $('addCoolerBtn').addEventListener('click', addCoolerRow);
@@ -2844,16 +2858,24 @@
 
     function renderProducerList() {
       const producers = activeProducers();
-      const aProducers = producers.filter(p => p.producerSource !== 'D');
-      const dProducers = producers.filter(p => p.producerSource === 'D');
-      $('producerListSummary').textContent = `4桁 ${aProducers.length}件 / 7桁 ${dProducers.length}件`;
-      $('producerAListRows').innerHTML = producerListRows(aProducers, 'A');
-      $('producerDListRows').innerHTML = producerListRows(dProducers, 'D');
+      const query = cleanText(state.producerListQuery).toLowerCase();
+      const aAll = producers.filter(p => p.producerSource !== 'D');
+      const dAll = producers.filter(p => p.producerSource === 'D');
+      const matchesQuery = producer => !query || cleanText(producer.producerName).toLowerCase().includes(query);
+      const aProducers = aAll.filter(matchesQuery);
+      const dProducers = dAll.filter(matchesQuery);
+      $('producerListSearch').value = state.producerListQuery;
+      $('producerListSummary').textContent = query
+        ? `表示 4桁 ${aProducers.length}/${aAll.length}件 / 7桁 ${dProducers.length}/${dAll.length}件`
+        : `4桁 ${aAll.length}件 / 7桁 ${dAll.length}件`;
+      const emptyMessage = query ? '該当する生産者がありません。' : '登録されていません。';
+      $('producerAListRows').innerHTML = producerListRows(aProducers, 'A', emptyMessage);
+      $('producerDListRows').innerHTML = producerListRows(dProducers, 'D', emptyMessage);
     }
 
-    function producerListRows(producers, source) {
+    function producerListRows(producers, source, emptyMessage = '登録されていません。') {
       if (!producers.length) {
-        return '<tr><td colspan="2" class="muted">登録されていません。</td></tr>';
+        return `<tr><td colspan="2" class="muted">${esc(emptyMessage)}</td></tr>`;
       }
       return producers.map(producer => {
         const p = enrichProducer({ ...producer, producerSource: source });
