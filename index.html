@@ -1359,16 +1359,23 @@
         <summary>生産者マスタ</summary>
         <div class="master-body">
           <div class="form-grid">
-            <label>Excelファイルパス
+            <label>ExcelファイルID/URL
               <input id="producerSourcePath" type="text" autocomplete="off">
             </label>
             <label>シート名
               <input id="producerSheetName" type="text" autocomplete="off">
             </label>
+            <label>更新間隔（時間）
+              <input id="producerSyncIntervalHours" type="number" min="1" step="1" autocomplete="off">
+            </label>
+            <label>即時反映URL
+              <input id="producerSyncWebAppUrl" type="url" autocomplete="off" placeholder="Apps Script WebアプリURL">
+            </label>
           </div>
           <div id="producerSourceStatus" class="notice setting-status"></div>
           <div class="action-row">
             <button type="button" id="saveProducerSettingsBtn">保存</button>
+            <button type="button" id="syncProducersNowBtn" class="secondary">即時反映</button>
           </div>
         </div>
       </details>
@@ -1391,8 +1398,10 @@
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
     const APP_HOME_URL = location.origin + location.pathname;
     const DEFAULT_PRODUCER_IMPORT_SOURCE = {
-      path: 'G:\\マイドライブ\\にんにく管理\\令和8年\\にんにく仕入れ管理表 エイト 令和8年産.xlsm',
-      sheetName: '仕入先一覧表'
+      path: 'https://drive.google.com/file/d/1ldXwvEHjKce0py91zJA4_T_AOSvrsWKg/view?usp=drive_link',
+      sheetName: '仕入先一覧表',
+      syncIntervalHours: 1,
+      syncWebAppUrl: ''
     };
     const state = {
       data: null,
@@ -1532,6 +1541,7 @@
       $('addWorkerBtn').addEventListener('click', addWorkerRow);
       $('saveWorkersBtn').addEventListener('click', () => withBusy('saveWorkersBtn', '保存中...', saveWorkers));
       $('saveProducerSettingsBtn').addEventListener('click', () => withBusy('saveProducerSettingsBtn', '保存中...', saveProducerSettings));
+      $('syncProducersNowBtn').addEventListener('click', () => withBusy('syncProducersNowBtn', '反映中...', syncProducersNow));
     }
 
     function bindMasterScrollAssist() {
@@ -3036,21 +3046,32 @@
       const sync = (state.data && state.data.master && state.data.master.producerSync) || DEFAULT_PRODUCER_IMPORT_SOURCE;
       $('producerSourcePath').value = sync.path || '';
       $('producerSheetName').value = sync.sheetName || DEFAULT_PRODUCER_IMPORT_SOURCE.sheetName;
+      $('producerSyncIntervalHours').value = Math.max(1, Number(sync.syncIntervalHours || 1));
+      $('producerSyncWebAppUrl').value = sync.syncWebAppUrl || '';
       const countText = [sync.aCount ? `A列 ${sync.aCount}件` : '', sync.dCount ? `D列 ${sync.dCount}件` : '']
         .filter(Boolean)
         .join(' / ');
+      const checkedText = sync.lastCheckedAt ? `最終確認 ${formatDateTimeText(sync.lastCheckedAt)}` : '最終確認 未実行';
       const updatedText = sync.lastSyncedAt ? `最終取込 ${formatDateTimeText(sync.lastSyncedAt)}` : '未取込';
-      $('producerSourceStatus').textContent = countText ? `${updatedText} / ${countText}` : updatedText;
+      const fileText = sync.fileUpdatedAt ? `Excel更新 ${formatDateTimeText(sync.fileUpdatedAt)}` : 'Excel更新 未確認';
+      const intervalText = `${Math.max(1, Number(sync.syncIntervalHours || 1))}時間ごと`;
+      $('producerSourceStatus').textContent = countText
+        ? `${checkedText} / ${updatedText} / ${fileText} / ${intervalText} / ${countText}`
+        : `${checkedText} / ${updatedText} / ${fileText} / ${intervalText}`;
     }
 
     async function saveProducerSettings() {
       try {
         const path = $('producerSourcePath').value.trim();
         const sheetName = $('producerSheetName').value.trim() || DEFAULT_PRODUCER_IMPORT_SOURCE.sheetName;
-        if (!path) throw new Error('Excelファイルパスを入力してください。');
+        const syncIntervalHours = Math.max(1, Math.floor(Number($('producerSyncIntervalHours').value || 1)));
+        const syncWebAppUrl = $('producerSyncWebAppUrl').value.trim();
+        if (!path) throw new Error('ExcelファイルIDまたはURLを入力してください。');
         const res = await api('saveProducerSettings', {
           path,
           sheetName,
+          syncIntervalHours,
+          syncWebAppUrl,
           sourceName: 'Excel',
           updatedAt: new Date().toISOString()
         });
@@ -3058,6 +3079,19 @@
       } catch (error) {
         showToast(error.message, true);
       }
+    }
+
+    async function syncProducersNow() {
+      const syncWebAppUrl = $('producerSyncWebAppUrl').value.trim()
+        || (state.data && state.data.master && state.data.master.producerSync && state.data.master.producerSync.syncWebAppUrl)
+        || '';
+      if (!syncWebAppUrl) throw new Error('即時反映URLを入力して保存してください。');
+      const url = new URL(syncWebAppUrl);
+      url.searchParams.set('action', 'sync');
+      url.searchParams.set('force', '1');
+      await fetch(url.toString(), { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+      showToast('生産者マスタ同期を開始しました。しばらくしてから再読み込みします。');
+      setTimeout(() => refreshAll().catch(error => showToast(error.message, true)), 12000);
     }
 
     function renderHistoryRows() {
@@ -3286,8 +3320,11 @@
         sourceName: 'Excel',
         path: DEFAULT_PRODUCER_IMPORT_SOURCE.path,
         sheetName: DEFAULT_PRODUCER_IMPORT_SOURCE.sheetName,
+        lastCheckedAt: '',
         lastSyncedAt: '',
         fileUpdatedAt: '',
+        syncIntervalHours: DEFAULT_PRODUCER_IMPORT_SOURCE.syncIntervalHours,
+        syncWebAppUrl: DEFAULT_PRODUCER_IMPORT_SOURCE.syncWebAppUrl,
         aCount: 0,
         dCount: 0
       }, setting || {});
