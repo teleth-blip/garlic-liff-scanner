@@ -392,6 +392,21 @@
       border-collapse: collapse;
       min-width: 720px;
     }
+    .producer-list-table {
+      min-width: 0;
+      table-layout: fixed;
+    }
+    .producer-list-table th:first-child,
+    .producer-list-table td:first-child {
+      width: 90px;
+      white-space: nowrap;
+    }
+    .producer-list-table th:last-child,
+    .producer-list-table td:last-child {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
     th, td {
       padding: 8px;
       border-bottom: 1px solid var(--line);
@@ -750,6 +765,11 @@
       overflow-y: hidden;
       overscroll-behavior: auto;
       touch-action: pan-x pan-y;
+    }
+    #masterPanel .producer-list-wrap {
+      overflow-x: visible;
+      overflow-y: visible;
+      touch-action: pan-y;
     }
     #masterPanel input,
     #masterPanel select,
@@ -1264,12 +1284,12 @@
         <div class="master-body">
           <div id="producerListSummary" class="producer-list-summary"></div>
           <h3>4桁 生産者（A列）</h3>
-          <div class="table-wrap">
-            <table><thead><tr><th>登録番号形式</th><th>元番号</th><th>生産者名</th></tr></thead><tbody id="producerAListRows"></tbody></table>
+          <div class="table-wrap producer-list-wrap">
+            <table class="producer-list-table"><thead><tr><th>番号形式</th><th>生産者名</th></tr></thead><tbody id="producerAListRows"></tbody></table>
           </div>
           <h3>7桁 生産者（D列）</h3>
-          <div class="table-wrap">
-            <table><thead><tr><th>登録番号形式</th><th>元番号</th><th>生産者名</th></tr></thead><tbody id="producerDListRows"></tbody></table>
+          <div class="table-wrap producer-list-wrap">
+            <table class="producer-list-table"><thead><tr><th>番号形式</th><th>生産者名</th></tr></thead><tbody id="producerDListRows"></tbody></table>
           </div>
         </div>
       </details>
@@ -2833,13 +2853,12 @@
 
     function producerListRows(producers, source) {
       if (!producers.length) {
-        return '<tr><td colspan="3" class="muted">登録されていません。</td></tr>';
+        return '<tr><td colspan="2" class="muted">登録されていません。</td></tr>';
       }
       return producers.map(producer => {
         const p = enrichProducer({ ...producer, producerSource: source });
         return `<tr>
           <td>${esc(producerListCode(p))}</td>
-          <td>${esc(p.producerDisplayNo)}</td>
           <td>${esc(p.producerName || '(名称なし)')}</td>
         </tr>`;
       }).join('');
