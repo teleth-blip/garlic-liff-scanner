@@ -159,11 +159,11 @@ function addProducerRow_(rowsByKey, source, rawNo, rawName, width, max, fileUpda
 function convertExcelToSpreadsheet_(fileId) {
   const file = DriveApp.getFileById(fileId);
   const resource = {
-    title: 'producer-sync-' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd-HHmmss'),
+    name: 'producer-sync-' + Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyyMMdd-HHmmss'),
     mimeType: MimeType.GOOGLE_SHEETS
   };
-  const inserted = Drive.Files.insert(resource, file.getBlob(), { convert: true });
-  return inserted.id;
+  const created = Drive.Files.create(resource, file.getBlob(), { fields: 'id' });
+  return created.id;
 }
 
 function resolveDriveFile_(sourceText) {
