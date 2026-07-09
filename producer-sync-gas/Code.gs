@@ -245,10 +245,7 @@ function supabaseRequest_(path, options) {
     contentType: 'application/json',
     payload: options.payload,
     muteHttpExceptions: true,
-    headers: Object.assign({
-      apikey: serviceKey,
-      Authorization: 'Bearer ' + serviceKey
-    }, options.headers || {})
+    headers: Object.assign(getSupabaseAuthHeaders_(serviceKey), options.headers || {})
   });
   const status = response.getResponseCode();
   const text = response.getContentText();
@@ -256,6 +253,14 @@ function supabaseRequest_(path, options) {
     throw new Error('Supabase APIエラー ' + status + ': ' + text);
   }
   return text ? JSON.parse(text) : null;
+}
+
+function getSupabaseAuthHeaders_(serviceKey) {
+  const headers = { apikey: serviceKey };
+  if (!String(serviceKey || '').startsWith('sb_secret_')) {
+    headers.Authorization = 'Bearer ' + serviceKey;
+  }
+  return headers;
 }
 
 function json_(payload) {
