@@ -874,8 +874,10 @@
       padding: 5mm;
       border: 1px dashed #c9cfd4;
       display: grid;
-      grid-template-columns: 47mm 1fr;
-      gap: 4mm;
+      grid-template-columns: 40mm minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      column-gap: 4mm;
+      row-gap: 1.5mm;
       align-items: start;
       overflow: hidden;
       break-inside: avoid;
@@ -893,39 +895,53 @@
     .label-sheet.layout-six .qr-label:nth-child(-n + 4) {
       border-bottom: 0.25mm dotted #777;
     }
+    .qr-code {
+      grid-column: 1;
+      grid-row: 2;
+    }
     .qr-code svg {
-      width: 47mm;
-      height: 47mm;
+      width: 40mm;
+      height: 40mm;
       display: block;
     }
     .qr-meta {
+      grid-column: 2;
+      grid-row: 2;
       min-width: 0;
       font-size: 10px;
       line-height: 1.22;
     }
-    .qr-meta .pallet-no {
-      margin-bottom: 2mm;
-      font-size: 18px;
+    .qr-title-line .pallet-no {
+      margin-bottom: 0;
+      font-size: 28px;
+      line-height: 1;
       font-weight: 900;
       overflow-wrap: anywhere;
     }
     .qr-title-line {
+      grid-column: 1 / -1;
+      grid-row: 1;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 3mm;
       align-items: baseline;
-      margin-bottom: 2mm;
+      margin-bottom: 0;
     }
-    .qr-title-line .pallet-no { margin-bottom: 0; }
     .qr-date {
       white-space: nowrap;
       font-size: 10px;
       font-weight: 800;
     }
+    .qr-weight {
+      margin-bottom: 1.5mm;
+      text-align: right;
+      font-size: 14px;
+      font-weight: 900;
+    }
     .detail-mini {
       width: 100%;
       min-width: 0;
-      margin-top: 2mm;
+      margin-top: 0;
       border-collapse: collapse;
     }
     .detail-mini th, .detail-mini td {
@@ -2266,13 +2282,13 @@
       const details = detailsFor(pallet.palletNo);
       return `
         <div class="qr-label">
+          <div class="qr-title-line">
+            <div class="pallet-no">${esc(pallet.palletNo)}</div>
+            <div class="qr-date">${esc(formatReiwaDate(new Date()))}</div>
+          </div>
           <div class="qr-code">${qrSvg(qrLaunchUrl(pallet.palletNo))}</div>
           <div class="qr-meta">
-            <div class="qr-title-line">
-              <div class="pallet-no">${esc(pallet.palletNo)}</div>
-              <div class="qr-date">${esc(formatReiwaDate(new Date()))}</div>
-            </div>
-            <div>重量 ${num(pallet.weight)}kg</div>
+            <div class="qr-weight">重量 ${num(pallet.weight)}kg</div>
             ${details.length ? detailMiniTable(details) : '<div>明細なし</div>'}
           </div>
         </div>
