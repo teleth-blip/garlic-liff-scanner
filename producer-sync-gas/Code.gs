@@ -124,6 +124,7 @@ function syncProducerMaster_(options) {
     return {
       skipped: false,
       message: '生産者マスタを同期しました。',
+      sheetName: sheetName,
       fileUpdatedAt: fileUpdatedIso,
       aCount: aCount,
       dCount: dCount,
@@ -154,6 +155,7 @@ function addProducerRow_(rowsByKey, source, rawNo, rawName, width, max, fileUpda
   if (!number || number < 1 || number > max) return;
   const producerNo = String(number).padStart(width, '0');
   const producerName = String(rawName || '').trim();
+  if (!producerName) return;
   rowsByKey[source + ':' + producerNo] = {
     producer_source: source,
     producer_no: producerNo,
