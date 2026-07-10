@@ -73,7 +73,7 @@ function syncProducerMaster_(options) {
   const fileUpdatedAt = file.getLastUpdated();
   const fileUpdatedIso = fileUpdatedAt.toISOString();
 
-  if (setting.fileUpdatedAt && new Date(setting.fileUpdatedAt).getTime() >= fileUpdatedAt.getTime()) {
+  if (!options.forceCheck && setting.fileUpdatedAt && new Date(setting.fileUpdatedAt).getTime() >= fileUpdatedAt.getTime()) {
     updateProducerSetting_(Object.assign({}, setting, {
       path: sourceText,
       fileId: fileId,
@@ -99,9 +99,11 @@ function syncProducerMaster_(options) {
     if (!sheet) throw new Error('指定されたシートが見つかりません: ' + sheetName);
 
     const rows = readProducerRows_(sheet, fileUpdatedIso);
-    upsertProducers_(rows);
+    replaceProducers_(rows);
     const aCount = rows.filter(row => row.producer_source === 'A').length;
     const dCount = rows.filter(row => row.producer_source === 'D').length;
+    const aMaxNo = maxProducerNo_(rows, 'A');
+    const dMaxNo = maxProducerNo_(rows, 'D');
 
     updateProducerSetting_(Object.assign({}, setting, {
       sourceName: 'Excel',
@@ -114,6 +116,8 @@ function syncProducerMaster_(options) {
       fileUpdatedAt: fileUpdatedIso,
       aCount: aCount,
       dCount: dCount,
+      aMaxNo: aMaxNo,
+      dMaxNo: dMaxNo,
       lastResult: 'synced'
     }));
 
@@ -122,7 +126,9 @@ function syncProducerMaster_(options) {
       message: '生産者マスタを同期しました。',
       fileUpdatedAt: fileUpdatedIso,
       aCount: aCount,
-      dCount: dCount
+      dCount: dCount,
+      aMaxNo: aMaxNo,
+      dMaxNo: dMaxNo
     };
   } finally {
     if (convertedFileId) {
@@ -203,7 +209,9 @@ function getProducerSetting_() {
     lastSyncedAt: '',
     fileUpdatedAt: '',
     aCount: 0,
-    dCount: 0
+    dCount: 0,
+    aMaxNo: 0,
+    dMaxNo: 0
   }, setting || {});
 }
 
@@ -232,6 +240,28 @@ function upsertProducers_(rows) {
       }
     });
   }
+}
+
+function replaceProducers_(rows) {
+  if (!rows.length) throw new Error('Excelから生産者データを読み取れませんでした。シート名とA/B/D/E列を確認してください。');
+  deleteProducersBySource_('A');
+  deleteProducersBySource_('D');
+  upsertProducers_(rows);
+}
+
+function deleteProducersBySource_(source) {
+  supabaseRequest_('/rest/v1/producers?producer_source=eq.' + encodeURIComponent(source), {
+    method: 'delete',
+    headers: {
+      Prefer: 'return=minimal'
+    }
+  });
+}
+
+function maxProducerNo_(rows, source) {
+  return rows
+    .filter(row => row.producer_source === source)
+    .reduce((max, row) => Math.max(max, Number(row.producer_no || 0)), 0);
 }
 
 function supabaseRequest_(path, options) {

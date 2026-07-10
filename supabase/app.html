@@ -3048,7 +3048,10 @@
       $('producerSheetName').value = sync.sheetName || DEFAULT_PRODUCER_IMPORT_SOURCE.sheetName;
       $('producerSyncIntervalHours').value = Math.max(1, Number(sync.syncIntervalHours || 1));
       $('producerSyncWebAppUrl').value = sync.syncWebAppUrl || '';
-      const countText = [sync.aCount ? `A列 ${sync.aCount}件` : '', sync.dCount ? `D列 ${sync.dCount}件` : '']
+      const countText = [
+        sync.aCount ? `A列 ${sync.aCount}件${sync.aMaxNo ? ` 最大${padNumber(sync.aMaxNo, 3)}番` : ''}` : '',
+        sync.dCount ? `D列 ${sync.dCount}件${sync.dMaxNo ? ` 最大${padNumber(sync.dMaxNo, 2)}番` : ''}` : ''
+      ]
         .filter(Boolean)
         .join(' / ');
       const checkedText = sync.lastCheckedAt ? `最終確認 ${formatDateTimeText(sync.lastCheckedAt)}` : '最終確認 未実行';
@@ -3326,7 +3329,9 @@
         syncIntervalHours: DEFAULT_PRODUCER_IMPORT_SOURCE.syncIntervalHours,
         syncWebAppUrl: DEFAULT_PRODUCER_IMPORT_SOURCE.syncWebAppUrl,
         aCount: 0,
-        dCount: 0
+        dCount: 0,
+        aMaxNo: 0,
+        dMaxNo: 0
       }, setting || {});
     }
 
