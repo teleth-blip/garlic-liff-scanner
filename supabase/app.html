@@ -864,6 +864,7 @@
     .label-sheet.layout-six {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       grid-template-rows: repeat(3, minmax(0, 1fr));
+      position: relative;
       width: 297mm;
       height: 210mm;
       padding: 0;
@@ -887,8 +888,15 @@
       padding: 6mm;
       border: none;
     }
-    .label-sheet.layout-six .qr-label:nth-child(odd) {
-      border-right: 0.25mm dashed #777;
+    .label-sheet.layout-six::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: calc(50% - 0.125mm);
+      width: 0.25mm;
+      background: repeating-linear-gradient(to bottom, #777 0 2mm, transparent 2mm 3.2mm);
+      pointer-events: none;
     }
     .label-sheet.layout-six .qr-label:nth-child(-n + 4) {
       border-bottom: 0.25mm dashed #777;
