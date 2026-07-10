@@ -288,11 +288,36 @@ function supabaseRequest_(path, options) {
 }
 
 function getSupabaseAuthHeaders_(serviceKey) {
-  const headers = { apikey: serviceKey };
-  if (!String(serviceKey || '').startsWith('sb_secret_')) {
-    headers.Authorization = 'Bearer ' + serviceKey;
+  const key = String(serviceKey || '').trim();
+  validateSupabaseServiceKey_(key);
+  const headers = { apikey: key };
+  if (!key.startsWith('sb_secret_')) {
+    headers.Authorization = 'Bearer ' + key;
   }
   return headers;
+}
+
+function validateSupabaseServiceKey_(key) {
+  if (!key) throw new Error('Script Properties に ' + CONFIG.propertyServiceKey + ' を設定してください。');
+  if (key.startsWith('sb_publishable_')) {
+    throw new Error(CONFIG.propertyServiceKey + ' には公開用 publishable key ではなく、Secret key（sb_secret_...）または legacy service_role key を設定してください。');
+  }
+
+  const role = supabaseJwtRole_(key);
+  if (role && role !== 'service_role') {
+    throw new Error(CONFIG.propertyServiceKey + ' に service_role ではないJWTキーが設定されています。現在のrole: ' + role);
+  }
+}
+
+function supabaseJwtRole_(key) {
+  const parts = String(key || '').split('.');
+  if (parts.length < 2) return '';
+  try {
+    const payload = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString('UTF-8');
+    return JSON.parse(payload).role || '';
+  } catch (error) {
+    return '';
+  }
 }
 
 function json_(payload) {
