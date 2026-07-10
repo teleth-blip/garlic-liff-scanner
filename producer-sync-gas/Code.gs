@@ -290,21 +290,26 @@ function supabaseRequest_(path, options) {
 function getSupabaseAuthHeaders_(serviceKey) {
   const key = String(serviceKey || '').trim();
   validateSupabaseServiceKey_(key);
-  const headers = { apikey: key };
-  if (!key.startsWith('sb_secret_')) {
-    headers.Authorization = 'Bearer ' + key;
-  }
-  return headers;
+  return {
+    apikey: key,
+    Authorization: 'Bearer ' + key
+  };
 }
 
 function validateSupabaseServiceKey_(key) {
   if (!key) throw new Error('Script Properties に ' + CONFIG.propertyServiceKey + ' を設定してください。');
   if (key.startsWith('sb_publishable_')) {
-    throw new Error(CONFIG.propertyServiceKey + ' には公開用 publishable key ではなく、Secret key（sb_secret_...）または legacy service_role key を設定してください。');
+    throw new Error(CONFIG.propertyServiceKey + ' には公開用 publishable key ではなく、Legacy API Keys の service_role key を設定してください。');
+  }
+  if (key.startsWith('sb_secret_')) {
+    throw new Error(CONFIG.propertyServiceKey + ' に sb_secret_... は使用できません。Apps ScriptではSupabase側にブラウザ扱いで拒否されるため、Legacy API Keys の service_role key を設定してください。');
   }
 
   const role = supabaseJwtRole_(key);
-  if (role && role !== 'service_role') {
+  if (!role) {
+    throw new Error(CONFIG.propertyServiceKey + ' にはLegacy API Keys の service_role JWTを設定してください。');
+  }
+  if (role !== 'service_role') {
     throw new Error(CONFIG.propertyServiceKey + ' に service_role ではないJWTキーが設定されています。現在のrole: ' + role);
   }
 }

@@ -7,7 +7,7 @@ Google Drive上のExcelファイルを定期確認し、更新されている場
 1. このフォルダをApps Scriptプロジェクトとして作成または `clasp push` します。
 2. Apps Scriptの「サービス」で Drive API を有効化します。
 3. スクリプトプロパティに以下を設定します。
-   - `SUPABASE_SERVICE_ROLE_KEY`: Supabaseのservice_role key
+   - `SUPABASE_SERVICE_ROLE_KEY`: Supabaseの Legacy API Keys にある `service_role` key
    - `SUPABASE_URL`: `https://yedrlbrzrkbtgswzplia.supabase.co`（省略可）
 4. `installHourlyProducerSyncTrigger` を1回実行して承認します。
 5. Webアプリとしてデプロイし、URLを本体画面の「即時反映URL」に保存します。
@@ -25,3 +25,9 @@ Google Drive上のExcelファイルを定期確認し、更新されている場
 - D列/E列: `producer_source = 'D'`, `producer_no = 2桁`
 
 一時変換したGoogleスプレッドシートは同期後にゴミ箱へ移動します。
+
+## Supabaseキー
+
+Apps Scriptでは `sb_secret_...` のSecret keyを使わず、Legacy API Keys の `service_role` keyを使います。
+`sb_secret_...` はSupabase側でブラウザ扱いとして拒否される場合があります。
+`sb_publishable_...` は公開画面用のキーなので、同期用には使えません。
