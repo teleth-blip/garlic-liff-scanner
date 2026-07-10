@@ -425,6 +425,11 @@
       font-weight: 800;
       white-space: nowrap;
     }
+    .memo-cell {
+      min-width: 160px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
     td input, td select {
       min-height: 38px;
       padding: 6px 8px;
@@ -1970,7 +1975,7 @@
           <td>${esc(p.status)}</td>
           <td>${num(p.weight)}</td>
           <td>${esc(p.currentLocationName || '')}</td>
-          <td>${esc(p.memo || '')}</td>
+          <td class="memo-cell">${esc(palletMemoText(p))}</td>
           <td>
             <button type="button" class="danger small" data-delete-pallet="${esc(p.palletNo)}">削除</button>
           </td>
@@ -1984,6 +1989,12 @@
         event.stopPropagation();
         deletePallet(btn.dataset.deletePallet);
       }));
+    }
+
+    function palletMemoText(pallet) {
+      const directMemo = cleanText(pallet && (pallet.memo || pallet.note || pallet.remarks));
+      if (directMemo) return directMemo;
+      return [...new Set(detailsFor(pallet.palletNo).map(detail => cleanText(detail.memo)).filter(Boolean))].join(' / ');
     }
 
     function addDetailRow(data = {}) {
@@ -3416,7 +3427,7 @@
         productionYear: String(row.crop_year || ''),
         serialNo: toNumber(row.serial_no),
         weight: toNumber(row.weight),
-        memo: row.memo || '',
+        memo: row.memo || row.note || row.remarks || '',
         status: row.status || '未配置',
         currentLocationId: locationId,
         currentLocationName: locationNames[locationId] || locationId,
