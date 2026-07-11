@@ -986,6 +986,18 @@
     @media print {
       @page { size: A4 landscape; margin: 0; }
       body { background: #fff; }
+      #printArea, #printArea * {
+        color: #000 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
+      #printArea svg {
+        filter: grayscale(1) contrast(1.2);
+      }
+      #printArea table, #printArea th, #printArea td {
+        border-color: #000 !important;
+      }
       .app-header, .tabs, .panel:not(#qrPanel), #qrPanel .section-title, #qrPanel .panel-note, #qrPanel .form-grid, #qrPanel .qr-pick-grid, #qrPanel .action-row, #toast {
         display: none !important;
       }
@@ -1012,10 +1024,10 @@
         border: none;
       }
       .label-sheet.layout-six .qr-label:nth-child(odd) {
-        border-right: 0.25mm dotted #777;
+        border-right: 0.25mm dotted #000;
       }
       .label-sheet.layout-six .qr-label:nth-child(-n + 4) {
-        border-bottom: 0.25mm dotted #777;
+        border-bottom: 0.25mm dotted #000;
       }
     }
   </style>
