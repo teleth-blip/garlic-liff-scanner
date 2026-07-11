@@ -252,6 +252,13 @@
       border-radius: 8px;
       background: var(--panel);
     }
+    body.launch-action-locked .tabs,
+    body.launch-action-locked main > [data-panel] {
+      pointer-events: none;
+      user-select: none;
+      opacity: .42;
+      filter: grayscale(1);
+    }
     .hidden { display: none !important; }
     .section-title {
       display: flex;
@@ -1469,7 +1476,8 @@
         readyReject: null,
         pending: {}
       },
-      launch: getLaunchParams()
+      launch: getLaunchParams(),
+      launchActionPending: false
     };
 
     const $ = id => document.getElementById(id);
@@ -1485,6 +1493,7 @@
       if (state.launch.palletNo) {
         $('launchPanel').classList.remove('hidden');
         $('launchPalletNo').textContent = state.launch.palletNo;
+        setLaunchActionPending(true);
       }
       await refreshWorkersOnly({ forLogin: true });
       if (restoreLogin()) {
@@ -1496,6 +1505,10 @@
 
     function bindEvents() {
       document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => {
+        if (state.launchActionPending) {
+          showToast('先にQR読取パレットの処理を選択してください。', true);
+          return;
+        }
         dismissLaunchPanel();
         setTab(btn.dataset.tab);
       }));
@@ -1741,6 +1754,7 @@
     function applyLaunchAction(action) {
       const palletNo = state.launch.palletNo;
       if (!palletNo) return;
+      setLaunchActionPending(false);
       dismissLaunchPanel();
       if (action === 'inbound') {
         lockActionPallet('inbound', palletNo);
@@ -1769,6 +1783,15 @@
         renderMoveStartGrid();
         renderMovingList();
       }
+    }
+
+    function setLaunchActionPending(pending) {
+      state.launchActionPending = !!pending;
+      document.body.classList.toggle('launch-action-locked', state.launchActionPending);
+      document.querySelectorAll('.tabs, [data-panel]').forEach(element => {
+        element.toggleAttribute('aria-disabled', state.launchActionPending);
+        if ('inert' in element) element.inert = state.launchActionPending;
+      });
     }
 
     function lockActionPallet(kind, palletNo) {
@@ -1860,7 +1883,6 @@
       ensureWorkerSelection();
       renderWorkers();
       await refreshAll();
-      if (state.launch.palletNo && state.launch.mode) applyLaunchAction(state.launch.mode);
     }
 
     async function login() {
