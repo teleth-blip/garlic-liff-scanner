@@ -930,7 +930,7 @@
       grid-row: 1;
       display: grid;
       grid-template-columns: max-content max-content minmax(0, 1fr);
-      gap: 2mm;
+      gap: 3mm;
       align-items: baseline;
       margin-bottom: 0;
     }
@@ -2295,7 +2295,7 @@
         <div class="qr-label">
           <div class="qr-title-line">
             <div class="pallet-no">${esc(pallet.palletNo)}</div>
-            <div class="qr-weight">重量 ${num(pallet.weight)}kg</div>
+            <div class="qr-weight">${num(pallet.weight)}kg</div>
             <div class="qr-date">${esc(formatReiwaDate(new Date()))}</div>
           </div>
           <div class="qr-code">${qrSvg(qrLaunchUrl(pallet.palletNo))}</div>
