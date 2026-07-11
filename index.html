@@ -879,7 +879,7 @@
       padding: 5mm;
       border: 1px dashed #c9cfd4;
       display: grid;
-      grid-template-columns: 33mm minmax(0, 1fr);
+      grid-template-columns: 36mm minmax(0, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
       column-gap: 4mm;
       row-gap: 1.5mm;
@@ -903,11 +903,11 @@
     .qr-code {
       grid-column: 1;
       grid-row: 2;
-      margin-top: 6mm;
+      margin-top: 1.5mm;
     }
     .qr-code svg {
-      width: 32mm;
-      height: 32mm;
+      width: 35mm;
+      height: 35mm;
       display: block;
     }
     .qr-meta {
@@ -930,8 +930,16 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 3mm;
-      align-items: baseline;
+      align-items: stretch;
       margin-bottom: 0;
+    }
+    .qr-title-side {
+      display: flex;
+      min-height: 11mm;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-end;
+      text-align: right;
     }
     .qr-date {
       white-space: nowrap;
@@ -939,7 +947,7 @@
       font-weight: 800;
     }
     .qr-weight {
-      margin-bottom: 1.5mm;
+      margin-bottom: 0;
       text-align: right;
       font-size: 14px;
       font-weight: 900;
@@ -2296,11 +2304,13 @@
         <div class="qr-label">
           <div class="qr-title-line">
             <div class="pallet-no">${esc(pallet.palletNo)}</div>
-            <div class="qr-date">${esc(formatReiwaDate(new Date()))}</div>
+            <div class="qr-title-side">
+              <div class="qr-date">${esc(formatReiwaDate(new Date()))}</div>
+              <div class="qr-weight">重量 ${num(pallet.weight)}kg</div>
+            </div>
           </div>
           <div class="qr-code">${qrSvg(qrLaunchUrl(pallet.palletNo))}</div>
           <div class="qr-meta">
-            <div class="qr-weight">重量 ${num(pallet.weight)}kg</div>
             ${details.length ? detailMiniTable(details) : '<div>明細なし</div>'}
           </div>
         </div>
