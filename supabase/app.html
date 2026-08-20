@@ -1116,13 +1116,43 @@
     </form>
   </div>
 
-  <div id="palletConfirmModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="palletConfirmTitle">
+  <div id="palletConfirmModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
     <div class="app-modal-card">
-      <h2 id="palletConfirmTitle">登録内容確認</h2>
-      <div id="palletConfirmBody"></div>
+      <h2 id="registerTitle">パレット登録</h2>
+      <div class="form-grid">
+        <label>年産
+          <input id="regYear" inputmode="numeric" autocomplete="off">
+        </label>
+        <label>パレット番号
+          <input id="regPalletNo" placeholder="空欄なら自動採番">
+        </label>
+        <label>重量（明細合計）
+          <input id="regWeight" inputmode="decimal" readonly>
+        </label>
+        <label>状態
+          <select id="regStatus" disabled>
+            <option value="未配置">未配置</option>
+            <option value="保管中">保管中</option>
+            <option value="仮移動中">仮移動中</option>
+            <option value="出庫済">出庫済</option>
+          </select>
+        </label>
+        <label>備考
+          <input id="regMemo">
+        </label>
+      </div>
+      <h3>明細</h3>
+      <div class="table-wrap">
+        <table id="detailTable">
+          <thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th><th></th></tr></thead>
+          <tbody id="detailRows"></tbody>
+        </table>
+      </div>
+      <datalist id="producerOptions"></datalist>
       <div class="action-row modal-actions">
         <button type="button" id="cancelPalletConfirmBtn" class="secondary">キャンセル</button>
-        <button type="button" id="confirmPalletSaveBtn">OK</button>
+        <button type="button" id="addDetailBtn" class="secondary">明細追加</button>
+        <button type="button" id="savePalletBtn">登録</button>
       </div>
     </div>
   </div>
@@ -1167,42 +1197,7 @@
 
     <section id="registerPanel" class="panel hidden" data-panel="register">
       <div class="action-row">
-        <span id="registerTitle" class="hidden">パレット登録</span>
-        <button type="button" id="clearRegisterBtn" class="secondary small">入力クリア</button>
-      </div>
-      <div class="form-grid">
-        <label>年産
-          <input id="regYear" inputmode="numeric" autocomplete="off">
-        </label>
-        <label>パレット番号
-          <input id="regPalletNo" placeholder="空欄なら自動採番">
-        </label>
-        <label>重量（明細合計）
-          <input id="regWeight" inputmode="decimal" readonly>
-        </label>
-        <label>状態
-          <select id="regStatus" disabled>
-            <option value="未配置">未配置</option>
-            <option value="保管中">保管中</option>
-            <option value="仮移動中">仮移動中</option>
-            <option value="出庫済">出庫済</option>
-          </select>
-        </label>
-        <label>備考
-          <input id="regMemo">
-        </label>
-      </div>
-      <h3>明細</h3>
-      <div class="table-wrap">
-        <table id="detailTable">
-          <thead><tr><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th><th></th></tr></thead>
-          <tbody id="detailRows"></tbody>
-        </table>
-      </div>
-      <datalist id="producerOptions"></datalist>
-      <div class="action-row">
-        <button type="button" id="addDetailBtn" class="secondary">明細追加</button>
-        <button type="button" id="savePalletBtn">登録</button>
+        <button type="button" id="openRegisterModalBtn">登録</button>
       </div>
       <h3>登録済みパレット</h3>
       <div class="table-wrap">
@@ -1531,7 +1526,6 @@
       tab: 'inbound',
       moveMode: 'start',
       editPalletNo: '',
-      pendingPalletSave: null,
       selectedLocations: { inbound: '', outbound: '', moveStart: '', move: '' },
       lockedPallets: { inbound: '', outbound: '', moveStart: '', moveDone: '' },
       inventorySelectedPalletNo: '',
@@ -1603,11 +1597,10 @@
         localStorage.setItem('garlic.workerId', state.workerId);
         saveLoginState(state.workerId);
       });
-      $('clearRegisterBtn').addEventListener('click', clearRegisterForm);
+      $('openRegisterModalBtn').addEventListener('click', openRegisterModal);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
-      $('savePalletBtn').addEventListener('click', savePallet);
+      $('savePalletBtn').addEventListener('click', () => withBusy('savePalletBtn', '保存中...', savePallet));
       $('cancelPalletConfirmBtn').addEventListener('click', closePalletConfirm);
-      $('confirmPalletSaveBtn').addEventListener('click', confirmPalletSave);
       $('palletConfirmModal').addEventListener('click', event => {
         if (event.target.id === 'palletConfirmModal') closePalletConfirm();
       });
@@ -2236,6 +2229,12 @@
       }) || null;
     }
 
+    function openRegisterModal() {
+      clearRegisterForm();
+      $('palletConfirmModal').classList.remove('hidden');
+      $('regYear').focus();
+    }
+
     function clearRegisterForm() {
       state.editPalletNo = '';
       $('registerTitle').textContent = 'パレット登録';
@@ -2249,6 +2248,7 @@
       setDefaultYear();
       $('detailRows').innerHTML = '';
       addDetailRow();
+      if (state.data) renderRegisterTable();
     }
 
     function editPallet(palletNo) {
@@ -2268,108 +2268,40 @@
       detailsFor(palletNo).forEach(addDetailRow);
       if (!$('detailRows').children.length) addDetailRow();
       renderRegisterTable();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      $('palletConfirmModal').classList.remove('hidden');
+      $('regYear').focus();
     }
 
-    function savePallet() {
+    async function savePallet() {
       try {
-        const draft = buildPalletSaveDraft();
-        state.pendingPalletSave = draft;
-        renderPalletConfirm(draft);
-        $('palletConfirmModal').classList.remove('hidden');
-        $('confirmPalletSaveBtn').focus();
+        updateRegisterWeight();
+        const productionYear = cleanText($('regYear').value);
+        const palletNo = state.editPalletNo
+          ? state.editPalletNo
+          : (cleanText($('regPalletNo').value) || nextPalletNo(productionYear));
+        if (!state.editPalletNo && !cleanText($('regPalletNo').value)) $('regPalletNo').value = palletNo;
+        const payload = {
+          productionYear,
+          palletNo,
+          weight: $('regWeight').value,
+          status: state.editPalletNo ? $('regStatus').value : '未配置',
+          memo: $('regMemo').value,
+          details: collectDetails()
+        };
+        const method = state.editPalletNo ? 'updatePallet' : 'registerPallet';
+        const res = await api(method, payload);
+        applyDataResponse(res);
+        $('palletConfirmModal').classList.add('hidden');
+        clearRegisterForm();
       } catch (error) {
         showToast(error.message, true);
       }
-    }
-
-    function buildPalletSaveDraft() {
-      updateRegisterWeight();
-      const productionYear = cleanText($('regYear').value);
-      const inputPalletNo = cleanText($('regPalletNo').value);
-      const autoFilledPalletNo = !state.editPalletNo && !inputPalletNo;
-      const palletNo = state.editPalletNo
-        ? state.editPalletNo
-        : (inputPalletNo || nextPalletNo(productionYear));
-      if (autoFilledPalletNo) $('regPalletNo').value = palletNo;
-      const payload = {
-        productionYear,
-        palletNo,
-        weight: $('regWeight').value,
-        status: state.editPalletNo ? $('regStatus').value : '未配置',
-        memo: $('regMemo').value,
-        details: collectDetails()
-      };
-      return {
-        method: state.editPalletNo ? 'updatePallet' : 'registerPallet',
-        payload,
-        isEdit: !!state.editPalletNo,
-        autoFilledPalletNo
-      };
-    }
-
-    function renderPalletConfirm(draft) {
-      const payload = draft.payload;
-      $('palletConfirmTitle').textContent = draft.isEdit ? '変更内容確認' : '登録内容確認';
-      const detailRows = payload.details.length
-        ? payload.details.map((detail, index) => `
-          <tr>
-            <td>${index + 1}</td>
-            <td>${esc(producerLabel(detail) || detail.producerNo || '')}</td>
-            <td>${esc(detail.standard || '')}</td>
-            <td>${esc(detail.weight || '')}</td>
-            <td>${esc(detail.price || '')}</td>
-            <td>${esc(detail.memo || '')}</td>
-          </tr>
-        `).join('')
-        : '<tr><td colspan="6" class="muted">明細なし</td></tr>';
-      $('palletConfirmBody').innerHTML = `
-        <div class="confirm-grid">
-          ${confirmItem('年産', payload.productionYear)}
-          ${confirmItem('パレット番号', payload.palletNo)}
-          ${confirmItem('重量', payload.weight ? `${payload.weight}kg` : '')}
-          ${confirmItem('状態', payload.status)}
-          ${confirmItem('備考', payload.memo || '')}
-        </div>
-        <h3>明細</h3>
-        <div class="table-wrap confirm-detail-wrap">
-          <table class="confirm-detail-table">
-            <thead><tr><th>No.</th><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th></tr></thead>
-            <tbody>${detailRows}</tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    function confirmItem(label, value) {
-      return `<div class="confirm-item"><span>${esc(label)}</span><strong>${esc(value || '')}</strong></div>`;
     }
 
     function closePalletConfirm() {
       if (state.busy) return;
-      const draft = state.pendingPalletSave;
-      if (draft && draft.autoFilledPalletNo && $('regPalletNo').value === draft.payload.palletNo) $('regPalletNo').value = '';
-      state.pendingPalletSave = null;
       $('palletConfirmModal').classList.add('hidden');
-    }
-
-    async function confirmPalletSave() {
-      const draft = state.pendingPalletSave;
-      if (!draft) {
-        closePalletConfirm();
-        return;
-      }
-      try {
-        await withBusy('confirmPalletSaveBtn', '保存中...', async () => {
-          const res = await api(draft.method, draft.payload);
-          applyDataResponse(res);
-          state.pendingPalletSave = null;
-          $('palletConfirmModal').classList.add('hidden');
-          clearRegisterForm();
-        });
-      } catch (error) {
-        showToast(error.message, true);
-      }
+      clearRegisterForm();
     }
 
     function nextPalletNo(productionYear) {
