@@ -140,6 +140,66 @@
       font-size: 13px;
       font-weight: 700;
     }
+    .app-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: rgba(15, 23, 18, .46);
+    }
+    .app-modal-card {
+      width: min(100%, 760px);
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, .2);
+    }
+    .app-modal-card h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    .confirm-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .confirm-item {
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+    }
+    .confirm-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .confirm-item strong {
+      display: block;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+      font-size: 15px;
+    }
+    .confirm-detail-wrap {
+      max-height: min(44vh, 340px);
+    }
+    .confirm-detail-table {
+      min-width: 640px;
+    }
+    .modal-actions {
+      position: sticky;
+      bottom: 0;
+      justify-content: flex-end;
+      padding-top: 10px;
+      background: #fff;
+    }
     @media (max-width: 420px) {
       .app-header {
         padding: calc(6px + env(safe-area-inset-top)) 6px 6px;
@@ -1056,6 +1116,17 @@
     </form>
   </div>
 
+  <div id="palletConfirmModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="palletConfirmTitle">
+    <div class="app-modal-card">
+      <h2 id="palletConfirmTitle">登録内容確認</h2>
+      <div id="palletConfirmBody"></div>
+      <div class="action-row modal-actions">
+        <button type="button" id="cancelPalletConfirmBtn" class="secondary">キャンセル</button>
+        <button type="button" id="confirmPalletSaveBtn">OK</button>
+      </div>
+    </div>
+  </div>
+
   <header class="app-header">
     <div class="header-row">
       <h1>にんにく冷蔵庫管理 DB版</h1>
@@ -1460,6 +1531,7 @@
       tab: 'inbound',
       moveMode: 'start',
       editPalletNo: '',
+      pendingPalletSave: null,
       selectedLocations: { inbound: '', outbound: '', moveStart: '', move: '' },
       lockedPallets: { inbound: '', outbound: '', moveStart: '', moveDone: '' },
       inventorySelectedPalletNo: '',
@@ -1533,7 +1605,15 @@
       });
       $('clearRegisterBtn').addEventListener('click', clearRegisterForm);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
-      $('savePalletBtn').addEventListener('click', () => withBusy('savePalletBtn', '保存中...', savePallet));
+      $('savePalletBtn').addEventListener('click', savePallet);
+      $('cancelPalletConfirmBtn').addEventListener('click', closePalletConfirm);
+      $('confirmPalletSaveBtn').addEventListener('click', confirmPalletSave);
+      $('palletConfirmModal').addEventListener('click', event => {
+        if (event.target.id === 'palletConfirmModal') closePalletConfirm();
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !$('palletConfirmModal').classList.contains('hidden')) closePalletConfirm();
+      });
       ['focus', 'click', 'pointerdown'].forEach(type => {
         $('qrLeftNo').addEventListener(type, () => renderPalletSuggestions('qrLeftNo', 'left'));
         $('qrRightNo').addEventListener(type, () => renderPalletSuggestions('qrRightNo', 'right'));
@@ -2006,7 +2086,7 @@
     }
 
     function renderRegisterTable() {
-      $('registeredPalletRows').innerHTML = sortedPallets().map(p => `
+      $('registeredPalletRows').innerHTML = registeredPalletsNewestFirst().map(p => `
         <tr class="selectable-row ${p.palletNo === state.editPalletNo ? 'selected' : ''}" data-edit-pallet="${esc(p.palletNo)}">
           <td>${esc(p.palletNo)}</td>
           <td>${esc(p.status)}</td>
@@ -2191,25 +2271,102 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    async function savePallet() {
+    function savePallet() {
       try {
-        const productionYear = cleanText($('regYear').value);
-        const palletNo = state.editPalletNo
-          ? state.editPalletNo
-          : (cleanText($('regPalletNo').value) || nextPalletNo(productionYear));
-        if (!state.editPalletNo && !cleanText($('regPalletNo').value)) $('regPalletNo').value = palletNo;
-        const payload = {
-          productionYear,
-          palletNo,
-          weight: $('regWeight').value,
-          status: state.editPalletNo ? $('regStatus').value : '未配置',
-          memo: $('regMemo').value,
-          details: collectDetails()
-        };
-        const method = state.editPalletNo ? 'updatePallet' : 'registerPallet';
-        const res = await api(method, payload);
-        applyDataResponse(res);
-        clearRegisterForm();
+        const draft = buildPalletSaveDraft();
+        state.pendingPalletSave = draft;
+        renderPalletConfirm(draft);
+        $('palletConfirmModal').classList.remove('hidden');
+        $('confirmPalletSaveBtn').focus();
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    }
+
+    function buildPalletSaveDraft() {
+      updateRegisterWeight();
+      const productionYear = cleanText($('regYear').value);
+      const inputPalletNo = cleanText($('regPalletNo').value);
+      const autoFilledPalletNo = !state.editPalletNo && !inputPalletNo;
+      const palletNo = state.editPalletNo
+        ? state.editPalletNo
+        : (inputPalletNo || nextPalletNo(productionYear));
+      if (autoFilledPalletNo) $('regPalletNo').value = palletNo;
+      const payload = {
+        productionYear,
+        palletNo,
+        weight: $('regWeight').value,
+        status: state.editPalletNo ? $('regStatus').value : '未配置',
+        memo: $('regMemo').value,
+        details: collectDetails()
+      };
+      return {
+        method: state.editPalletNo ? 'updatePallet' : 'registerPallet',
+        payload,
+        isEdit: !!state.editPalletNo,
+        autoFilledPalletNo
+      };
+    }
+
+    function renderPalletConfirm(draft) {
+      const payload = draft.payload;
+      $('palletConfirmTitle').textContent = draft.isEdit ? '変更内容確認' : '登録内容確認';
+      const detailRows = payload.details.length
+        ? payload.details.map((detail, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${esc(producerLabel(detail) || detail.producerNo || '')}</td>
+            <td>${esc(detail.standard || '')}</td>
+            <td>${esc(detail.weight || '')}</td>
+            <td>${esc(detail.price || '')}</td>
+            <td>${esc(detail.memo || '')}</td>
+          </tr>
+        `).join('')
+        : '<tr><td colspan="6" class="muted">明細なし</td></tr>';
+      $('palletConfirmBody').innerHTML = `
+        <div class="confirm-grid">
+          ${confirmItem('年産', payload.productionYear)}
+          ${confirmItem('パレット番号', payload.palletNo)}
+          ${confirmItem('重量', payload.weight ? `${payload.weight}kg` : '')}
+          ${confirmItem('状態', payload.status)}
+          ${confirmItem('備考', payload.memo || '')}
+        </div>
+        <h3>明細</h3>
+        <div class="table-wrap confirm-detail-wrap">
+          <table class="confirm-detail-table">
+            <thead><tr><th>No.</th><th>生産者</th><th>規格</th><th>重量</th><th>価格</th><th>備考</th></tr></thead>
+            <tbody>${detailRows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function confirmItem(label, value) {
+      return `<div class="confirm-item"><span>${esc(label)}</span><strong>${esc(value || '')}</strong></div>`;
+    }
+
+    function closePalletConfirm() {
+      if (state.busy) return;
+      const draft = state.pendingPalletSave;
+      if (draft && draft.autoFilledPalletNo && $('regPalletNo').value === draft.payload.palletNo) $('regPalletNo').value = '';
+      state.pendingPalletSave = null;
+      $('palletConfirmModal').classList.add('hidden');
+    }
+
+    async function confirmPalletSave() {
+      const draft = state.pendingPalletSave;
+      if (!draft) {
+        closePalletConfirm();
+        return;
+      }
+      try {
+        await withBusy('confirmPalletSaveBtn', '保存中...', async () => {
+          const res = await api(draft.method, draft.payload);
+          applyDataResponse(res);
+          state.pendingPalletSave = null;
+          $('palletConfirmModal').classList.add('hidden');
+          clearRegisterForm();
+        });
       } catch (error) {
         showToast(error.message, true);
       }
@@ -3512,6 +3669,11 @@
       return match ? Number(match[1]) : 0;
     }
 
+    function palletYearFromNo(palletNo) {
+      const match = String(palletNo || '').match(/^(\d{4})-/);
+      return match ? Number(match[1]) : 0;
+    }
+
     function toNumber(value) {
       const number = Number(value || 0);
       return Number.isFinite(number) ? number : 0;
@@ -3553,6 +3715,17 @@
         .sort(compareProducer);
     }
     function sortedPallets() { return state.data ? [...state.data.pallets].sort((a, b) => a.palletNo.localeCompare(b.palletNo)) : []; }
+    function registeredPalletsNewestFirst() {
+      return state.data ? [...state.data.pallets].sort((a, b) => {
+        const aYear = Number(a.productionYear || palletYearFromNo(a.palletNo) || 0);
+        const bYear = Number(b.productionYear || palletYearFromNo(b.palletNo) || 0);
+        if (aYear !== bYear) return bYear - aYear;
+        const aSerial = Number(a.serialNo || palletSerialFromNo(a.palletNo) || 0);
+        const bSerial = Number(b.serialNo || palletSerialFromNo(b.palletNo) || 0);
+        if (aSerial !== bSerial) return bSerial - aSerial;
+        return b.palletNo.localeCompare(a.palletNo, 'ja');
+      }) : [];
+    }
     function findPallet(palletNo) { return state.data && state.data.pallets.find(p => p.palletNo === String(palletNo || '').trim()); }
     function findProducer(producerNo, sourceHint = '') {
       const target = cleanText(producerNo);
