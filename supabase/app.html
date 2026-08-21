@@ -463,7 +463,7 @@
     .register-detail-wrap {
       min-height: min(38vh, 340px);
       max-height: min(62vh, 560px);
-      touch-action: pan-x pan-y;
+      touch-action: pan-y;
     }
     #detailTable {
       min-width: 620px;
@@ -475,7 +475,7 @@
     }
     #detailTable input,
     #detailTable select {
-      touch-action: pan-x pan-y;
+      touch-action: pan-y;
     }
     table {
       width: 100%;
@@ -1603,6 +1603,7 @@
         if (!event.target.closest('.pallet-pick-field')) closePalletSuggestions();
       });
       bindMasterScrollAssist();
+      bindRegisterDetailHorizontalScroll();
       $('reloadBtn').addEventListener('click', refreshAll);
       $('logoutBtn').addEventListener('click', logout);
       $('loginForm').addEventListener('submit', event => {
@@ -1732,6 +1733,42 @@
       });
     }
 
+    function bindRegisterDetailHorizontalScroll() {
+      const wrap = document.querySelector('.register-detail-wrap');
+      let drag = null;
+
+      wrap.addEventListener('touchstart', event => {
+        if (event.touches.length !== 1) {
+          drag = null;
+          return;
+        }
+        const touch = event.touches[0];
+        drag = {
+          startX: touch.clientX,
+          startY: touch.clientY,
+          lastX: touch.clientX,
+          horizontal: false
+        };
+      }, { passive: true });
+
+      wrap.addEventListener('touchmove', event => {
+        if (!drag || event.touches.length !== 1) return;
+        const touch = event.touches[0];
+        const dx = touch.clientX - drag.startX;
+        const dy = touch.clientY - drag.startY;
+        if (!drag.horizontal) {
+          if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return;
+          drag.horizontal = true;
+        }
+        wrap.scrollLeft += drag.lastX - touch.clientX;
+        drag.lastX = touch.clientX;
+        event.preventDefault();
+      }, { passive: false });
+
+      ['touchend', 'touchcancel'].forEach(type => {
+        wrap.addEventListener(type, () => { drag = null; }, { passive: true });
+      });
+    }
     async function withBusy(buttonId, busyText, task) {
       if (state.busy) return;
       const btn = $(buttonId);
