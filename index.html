@@ -473,6 +473,10 @@
       padding-top: 10px;
       padding-bottom: 10px;
     }
+    #detailTable input,
+    #detailTable select {
+      touch-action: pan-y;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -1599,6 +1603,7 @@
         if (!event.target.closest('.pallet-pick-field')) closePalletSuggestions();
       });
       bindMasterScrollAssist();
+      bindRegisterDetailScrollAssist();
       $('reloadBtn').addEventListener('click', refreshAll);
       $('logoutBtn').addEventListener('click', logout);
       $('loginForm').addEventListener('submit', event => {
@@ -1725,6 +1730,56 @@
 
       ['touchend', 'touchcancel'].forEach(type => {
         panel.addEventListener(type, () => { drag = null; }, { passive: true });
+      });
+    }
+
+    function bindRegisterDetailScrollAssist() {
+      const modal = $('palletConfirmModal');
+      let drag = null;
+      const findField = target => target && target.closest && target.closest('#detailTable input, #detailTable select, #detailTable textarea');
+
+      modal.addEventListener('touchstart', event => {
+        const field = findField(event.target);
+        const wrap = field && field.closest('.register-detail-wrap');
+        if (!field || !wrap || event.touches.length !== 1) {
+          drag = null;
+          return;
+        }
+        const touch = event.touches[0];
+        drag = {
+          wrap,
+          card: field.closest('.app-modal-card'),
+          startX: touch.clientX,
+          startY: touch.clientY,
+          lastY: touch.clientY,
+          active: false
+        };
+      }, { passive: true });
+
+      modal.addEventListener('touchmove', event => {
+        if (!drag || event.touches.length !== 1) return;
+        const touch = event.touches[0];
+        const dx = touch.clientX - drag.startX;
+        const dy = touch.clientY - drag.startY;
+        if (!drag.active) {
+          if (Math.abs(dy) < 10 || Math.abs(dy) <= Math.abs(dx)) return;
+          drag.active = true;
+          if (document.activeElement && modal.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+          }
+        }
+        const delta = drag.lastY - touch.clientY;
+        const maxScroll = drag.wrap.scrollHeight - drag.wrap.clientHeight;
+        const atTop = drag.wrap.scrollTop <= 0;
+        const atBottom = drag.wrap.scrollTop >= maxScroll - 1;
+        const target = ((delta < 0 && atTop) || (delta > 0 && atBottom)) && drag.card ? drag.card : drag.wrap;
+        target.scrollTop += delta;
+        drag.lastY = touch.clientY;
+        event.preventDefault();
+      }, { passive: false });
+
+      ['touchend', 'touchcancel'].forEach(type => {
+        modal.addEventListener(type, () => { drag = null; }, { passive: true });
       });
     }
 
