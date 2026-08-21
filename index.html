@@ -740,7 +740,7 @@
     }
     .search-controls {
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) minmax(140px, 180px);
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
       gap: 8px;
       align-items: end;
       margin-bottom: 10px;
@@ -1389,8 +1389,14 @@
     </section>
     <section id="searchPanel" class="panel hidden" data-panel="search">
       <div class="search-controls">
-        <label>検索
-          <input id="searchQuery" autocomplete="off" placeholder="生産者・規格・冷蔵庫・パレット番号">
+        <label>生産者
+          <input id="searchProducer" autocomplete="off" placeholder="番号・名前">
+        </label>
+        <label>規格
+          <input id="searchStandard" autocomplete="off">
+        </label>
+        <label>冷蔵庫
+          <input id="searchCooler" autocomplete="off" placeholder="冷蔵庫名・ID">
         </label>
         <label>状態
           <select id="searchStatus">
@@ -1401,21 +1407,12 @@
             <option value="出庫済">出庫済</option>
           </select>
         </label>
+        <label>パレット番号
+          <input id="searchPalletNo" autocomplete="off">
+        </label>
       </div>
-      <div class="search-section">
-        <h3>生産者別合計</h3>
-        <div id="producerTotalGroups" class="search-groups"></div>
-      </div>
-      <div class="search-section">
-        <h3>冷蔵庫別合計</h3>
-        <div id="coolerTotalGroups" class="search-groups"></div>
-      </div>
-      <div class="search-section">
-        <h3>冷蔵庫内 規格別合計</h3>
-        <div id="coolerStandardGroups" class="search-groups"></div>
-      </div>
+      <div id="searchResults"></div>
     </section>
-
     <section id="masterPanel" class="panel hidden" data-panel="master">
       <details class="master-section" open>
         <summary>生産者一覧</summary>
@@ -1671,7 +1668,7 @@
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
-      $('searchQuery').addEventListener('input', renderSearch);
+      ['searchProducer', 'searchStandard', 'searchCooler', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
       $('searchStatus').addEventListener('change', renderSearch);
       $('producerListSearch').addEventListener('input', () => {
         state.producerListQuery = $('producerListSearch').value.trim();
@@ -2856,76 +2853,59 @@
     function renderSearch() {
       if (!state.data) return;
       const rows = searchDetailRows();
-      const storedRows = rows.filter(row => row.location);
-      const producerGroups = groupSearchRows(rows, row => row.producerText, row => ({
-        title: row.producerText || '(生産者なし)',
-        standard: '全規格'
-      })).sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-      const coolerGroups = groupSearchRows(storedRows, row => row.coolerName, row => ({
-        title: row.coolerName || '(冷蔵庫なし)',
-        standard: '全規格'
-      })).sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-      const coolerStandardGroups = groupSearchRows(storedRows, row => `${row.coolerName}|${row.standard}`, row => ({
-        title: row.coolerName || '(冷蔵庫なし)',
-        standard: row.standard || '(規格なし)'
-      })).sort((a, b) => a.title.localeCompare(b.title, 'ja') || a.standard.localeCompare(b.standard, 'ja'));
-      renderSearchGroups($('producerTotalGroups'), producerGroups, {
-        primaryLabel: '生産者',
-        tailLabel: '保管場所',
-        tailKey: 'storageList',
-        showStandardSummary: true
-      });
-      renderSearchGroups($('coolerTotalGroups'), coolerGroups, {
-        primaryLabel: '冷蔵庫',
-        tailLabel: '生産者',
-        tailKey: 'producerList',
-        showStandardSummary: true
-      });
-      renderSearchGroups($('coolerStandardGroups'), coolerStandardGroups, {
-        primaryLabel: '冷蔵庫',
-        tailLabel: '生産者',
-        tailKey: 'producerList',
-        showStandardSummary: false
-      });
+      const container = $('searchResults');
+      if (!rows.length) {
+        container.innerHTML = '<div class="search-empty">該当する明細がありません。</div>';
+        return;
+      }
+      container.innerHTML = searchDetailTable(rows);
+      bindSearchDetailActions(container);
     }
 
     function searchDetailRows() {
-      const query = cleanText($('searchQuery').value).toLowerCase();
-      const status = $('searchStatus').value;
-      return (state.data.details || []).map(detail => {
-        const pallet = findPallet(detail.palletNo) || {};
+      const filters = {
+        producer: cleanText($('searchProducer').value).toLowerCase(),
+        standard: cleanText($('searchStandard').value).toLowerCase(),
+        cooler: cleanText($('searchCooler').value).toLowerCase(),
+        status: cleanText($('searchStatus').value).toLowerCase(),
+        palletNo: cleanText($('searchPalletNo').value).toLowerCase()
+      };
+      const detailsByPallet = new Map();
+      (state.data.details || []).forEach(detail => {
+        if (!detailsByPallet.has(detail.palletNo)) detailsByPallet.set(detail.palletNo, []);
+        detailsByPallet.get(detail.palletNo).push(detail);
+      });
+      const includes = (value, query) => !query || cleanText(value).toLowerCase().includes(query);
+      return (state.data.pallets || []).flatMap(pallet => {
         const location = pallet.currentLocationId ? (findLocation(pallet.currentLocationId) || parseLocationId(pallet.currentLocationId)) : null;
         const cooler = location ? activeCoolers().find(c => c.coolerId === location.coolerId) : null;
-        const producerText = producerLabel(detail) || '(生産者なし)';
-        const storageLabel = currentStorageDetailLabel(pallet);
-        const row = {
-          ...detail,
-          pallet,
-          palletStatus: pallet.status || '',
-          storageLabel,
-          location,
-          coolerName: cooler ? cooler.coolerName : (location ? location.coolerId : ''),
-          producerText
-        };
-        row.searchText = [
-          row.palletNo,
-          row.palletStatus,
-          row.producerNo,
-          row.producerName,
-          producerText,
-          row.standard,
-          row.containerCount,
-          storageLabel,
-          row.coolerName
-        ].filter(Boolean).join(' ').toLowerCase();
-        return row;
-      }).filter(row => (!status || row.palletStatus === status) && (!query || row.searchText.includes(query)))
-        .sort((a, b) => a.producerText.localeCompare(b.producerText, 'ja')
-          || a.standard.localeCompare(b.standard, 'ja')
-          || a.palletNo.localeCompare(b.palletNo, 'ja')
-          || a.detailNo - b.detailNo);
+        const coolerName = cooler ? cooler.coolerName : (location ? location.coolerId : '');
+        const coolerText = [coolerName, location && location.coolerId].filter(Boolean).join(' ');
+        const details = detailsByPallet.get(pallet.palletNo) || [{}];
+        return details.map(detail => {
+          const producerText = producerLabel(detail) || '';
+          return {
+            ...detail,
+            palletNo: pallet.palletNo,
+            pallet,
+            palletStatus: pallet.status || '',
+            storageLabel: currentStorageDetailLabel(pallet),
+            location,
+            coolerName,
+            coolerText,
+            producerText,
+            detailNo: Number(detail.detailNo || 0)
+          };
+        });
+      }).filter(row => {
+        const producerValue = [row.producerNo, row.producerName, row.producerText].filter(Boolean).join(' ');
+        return includes(producerValue, filters.producer)
+          && includes(row.standard, filters.standard)
+          && includes(row.coolerText, filters.cooler)
+          && includes(row.palletStatus, filters.status)
+          && includes(row.palletNo, filters.palletNo);
+      }).sort((a, b) => a.palletNo.localeCompare(b.palletNo, 'ja') || a.detailNo - b.detailNo);
     }
-
     function groupSearchRows(rows, keyFn, metaFn) {
       const groups = new Map();
       rows.forEach(row => {
