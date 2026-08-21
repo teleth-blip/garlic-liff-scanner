@@ -1207,8 +1207,8 @@
         <label>パレット番号
           <input id="regPalletNo" placeholder="空欄なら自動採番">
         </label>
-        <label>重量（明細合計）
-          <input id="regWeight" inputmode="decimal" readonly>
+        <label>パレット重量
+          <input id="regWeight" inputmode="decimal">
         </label>
         <label>状態
           <select id="regStatus" disabled>
@@ -1693,6 +1693,7 @@
         saveLoginState(state.workerId);
       });
       $('openRegisterModalBtn').addEventListener('click', openRegisterModal);
+      $('regWeight').addEventListener('input', distributeDetailWeightsByContainerCount);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
       $('savePalletBtn').addEventListener('click', () => withBusy('savePalletBtn', '保存中...', savePallet));
       $('cancelPalletConfirmBtn').addEventListener('click', closePalletConfirm);
@@ -2362,12 +2363,12 @@
         if (producer) producerSearch.value = producerChoiceDisplay(producer);
       });
       tr.querySelector('[data-detail="weight"]').addEventListener('input', updateRegisterWeight);
+      tr.querySelector('[data-detail="memo"]').addEventListener('input', distributeDetailWeightsByContainerCount);
       tr.querySelector('button').addEventListener('click', () => {
         tr.remove();
-        updateRegisterWeight();
+        distributeDetailWeightsByContainerCount();
       });
       $('detailRows').appendChild(tr);
-      updateRegisterWeight();
     }
 
     function standardOptions(selected) {
@@ -2490,11 +2491,11 @@
       $('regPalletNo').disabled = true;
       $('regStatus').value = pallet.status || '未配置';
       $('regStatus').disabled = false;
-      $('regWeight').value = pallet.weight || '';
       $('regMemo').value = pallet.memo || '';
       $('detailRows').innerHTML = '';
       detailsFor(palletNo).forEach(addDetailRow);
       if (!$('detailRows').children.length) addDetailRow();
+      $('regWeight').value = pallet.weight || '';
       renderRegisterTable();
       $('palletConfirmModal').classList.remove('hidden');
       $('regYear').focus();
@@ -2556,6 +2557,26 @@
       const total = Array.from($('detailRows').querySelectorAll('[data-detail="weight"]'))
         .reduce((sum, input) => sum + parseInputNumber(input.value), 0);
       $('regWeight').value = total ? formatInputNumber(total) : '';
+    }
+
+    function distributeDetailWeightsByContainerCount() {
+      const palletWeightText = $('regWeight').value.trim();
+      if (!palletWeightText) return;
+      const palletWeight = parseInputNumber(palletWeightText);
+      const rows = Array.from($('detailRows').querySelectorAll('tr'));
+      const counts = rows.map(tr => Math.max(0, parseInputNumber(tr.querySelector('[data-detail="memo"]').value)));
+      const totalContainers = counts.reduce((sum, count) => sum + count, 0);
+      if (!totalContainers) return;
+
+      const weights = counts.map(count => count > 0 ? Math.round(palletWeight * count / totalContainers) : 0);
+      const roundedTotal = weights.reduce((sum, weight) => sum + weight, 0);
+      const adjustmentIndex = counts.findIndex(count => count > 0);
+      weights[adjustmentIndex] += Number((palletWeight - roundedTotal).toFixed(3));
+
+      rows.forEach((tr, index) => {
+        tr.querySelector('[data-detail="weight"]').value = formatInputNumber(weights[index]);
+      });
+      updateRegisterWeight();
     }
 
     function parseInputNumber(value) {
