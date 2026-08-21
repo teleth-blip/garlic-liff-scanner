@@ -538,10 +538,31 @@
       font-weight: 800;
       white-space: nowrap;
     }
-    .memo-cell {
-      min-width: 160px;
+    .register-list-table {
+      min-width: 500px;
+      table-layout: fixed;
+    }
+    .register-list-table th,
+    .register-list-table td {
+      padding: 6px 5px;
+      font-size: 12px;
+    }
+    .register-list-table th:nth-child(1),
+    .register-list-table td:nth-child(1) { width: 96px; }
+    .register-list-table th:nth-child(2),
+    .register-list-table td:nth-child(2) { width: 66px; }
+    .register-list-table th:nth-child(3),
+    .register-list-table td:nth-child(3) { width: 58px; text-align: right; }
+    .register-list-table th:nth-child(4),
+    .register-list-table td:nth-child(4) { width: 132px; }
+    .register-list-table th:nth-child(5),
+    .register-list-table td:nth-child(5) { width: 72px; text-align: right; }
+    .register-list-table th:nth-child(6),
+    .register-list-table td:nth-child(6) { width: 62px; text-align: center; }
+    .register-location-cell {
       white-space: normal;
       overflow-wrap: anywhere;
+      line-height: 1.25;
     }
     td input, td select {
       min-height: 38px;
@@ -1301,8 +1322,8 @@
       </div>
       <h3>登録済みパレット</h3>
       <div class="table-wrap">
-        <table>
-          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>場所</th><th>備考</th><th>操作</th></tr></thead>
+        <table class="register-list-table">
+          <thead><tr><th>パレット</th><th>状態</th><th>重量</th><th>場所</th><th>コンテナ数</th><th>操作</th></tr></thead>
           <tbody id="registeredPalletRows"></tbody>
         </table>
       </div>
@@ -2314,8 +2335,8 @@
           <td>${esc(p.palletNo)}</td>
           <td>${esc(p.status)}</td>
           <td>${num(p.weight)}</td>
-          <td>${esc(p.currentLocationName || '')}</td>
-          <td class="memo-cell">${esc(palletMemoText(p))}</td>
+          <td class="register-location-cell">${esc(currentStorageLabel(p))}</td>
+          <td>${esc(palletContainerCountText(p.palletNo))}</td>
           <td>
             <button type="button" class="danger small" data-delete-pallet="${esc(p.palletNo)}">削除</button>
           </td>
@@ -2331,10 +2352,12 @@
       }));
     }
 
-    function palletMemoText(pallet) {
-      const directMemo = cleanText(pallet && (pallet.memo || pallet.note || pallet.remarks));
-      if (directMemo) return directMemo;
-      return '';
+    function palletContainerCountText(palletNo) {
+      const details = detailsFor(palletNo);
+      const hasContainerCount = details.some(detail => detailContainerCountText(detail) !== '');
+      if (!hasContainerCount) return '';
+      const total = details.reduce((sum, detail) => sum + detailContainerCountNumber(detail), 0);
+      return num(total);
     }
 
     function addDetailRow(data = {}) {
