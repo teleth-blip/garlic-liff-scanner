@@ -2702,11 +2702,12 @@
       el.innerHTML = palletSummaryHtml(pallet);
     }
 
-    function palletSummaryHtml(pallet) {
+    function palletSummaryHtml(pallet, showRegisteredAt = false) {
       const details = detailsFor(pallet.palletNo);
       return `
         <div><strong>${esc(pallet.palletNo)}</strong> / ${esc(pallet.status)} / ${num(pallet.weight)}kg</div>
         <div>保管: ${esc(currentStorageLabel(pallet))}</div>
+        ${showRegisteredAt ? `<div>登録日時: ${esc(pallet.registeredAt || '')}</div>` : ''}
         <div>備考: ${esc(pallet.memo || '')}</div>
         ${details.length ? detailSummaryTable(details) : '<div class="muted">明細なし</div>'}
       `;
@@ -2849,7 +2850,7 @@
         return;
       }
       el.classList.remove('hidden');
-      el.innerHTML = palletSummaryHtml(pallet);
+      el.innerHTML = palletSummaryHtml(pallet, true);
     }
 
     function renderSearch() {
