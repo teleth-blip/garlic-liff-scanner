@@ -373,8 +373,8 @@ begin
   if not found then
     raise exception 'パレットが見つかりません: %', v_pallet_no;
   end if;
-  if v_pallet.status <> '未配置' then
-    raise exception '入庫できるのは未配置のパレットだけです。現在の状態: %', v_pallet.status;
+  if v_pallet.status not in ('未配置', '出庫済') then
+    raise exception '入庫できるのは未配置または出庫済のパレットだけです。現在の状態: %', v_pallet.status;
   end if;
 
   select * into v_location from public.require_location_can_receive(v_location_id);
