@@ -1390,10 +1390,10 @@
     <section id="searchPanel" class="panel hidden" data-panel="search">
       <div class="search-controls">
         <label>生産者
-          <input id="searchProducer" autocomplete="off" placeholder="番号・名前">
+          <input id="searchProducer" list="searchProducerOptions" autocomplete="off" placeholder="番号・名前">
         </label>
         <label>規格
-          <select id="searchStandard"></select>
+          <input id="searchStandard" list="searchStandardOptions" autocomplete="off">
         </label>
         <label>冷蔵庫
           <select id="searchCooler"></select>
@@ -1411,6 +1411,8 @@
           <input id="searchPalletNo" autocomplete="off">
         </label>
       </div>
+      <datalist id="searchProducerOptions"></datalist>
+      <datalist id="searchStandardOptions"></datalist>
       <div id="searchResults"></div>
     </section>
     <section id="masterPanel" class="panel hidden" data-panel="master">
@@ -1668,8 +1670,8 @@
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
-      ['searchProducer', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
-      ['searchStandard', 'searchCooler', 'searchStatus'].forEach(id => $(id).addEventListener('change', renderSearch));
+      ['searchProducer', 'searchStandard', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
+      ['searchCooler', 'searchStatus'].forEach(id => $(id).addEventListener('change', renderSearch));
       $('producerListSearch').addEventListener('input', () => {
         state.producerListQuery = $('producerListSearch').value.trim();
         renderProducerList();
@@ -2115,12 +2117,12 @@
     }
 
     function renderSearchOptions() {
-      const standardSelect = $('searchStandard');
-      const previousStandard = standardSelect.value;
-      standardSelect.innerHTML = '<option value="">すべて</option>' + activeStandards()
-        .map(standard => `<option value="${esc(standard.standardName)}">${esc(standard.standardName)}</option>`)
+      $('searchProducerOptions').innerHTML = activeProducers()
+        .map(producer => `<option value="${esc(producerChoiceDisplay(producer))}"></option>`)
         .join('');
-      if (activeStandards().some(standard => standard.standardName === previousStandard)) standardSelect.value = previousStandard;
+      $('searchStandardOptions').innerHTML = activeStandards()
+        .map(standard => `<option value="${esc(standard.standardName)}"></option>`)
+        .join('');
 
       const coolerSelect = $('searchCooler');
       const previousCooler = coolerSelect.value;
@@ -2129,7 +2131,6 @@
         .join('');
       if (activeCoolers().some(cooler => cooler.coolerId === previousCooler)) coolerSelect.value = previousCooler;
     }
-
     function renderCoolerOptions(id) {
       const select = $(id);
       const previous = select.value;
