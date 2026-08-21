@@ -164,7 +164,7 @@
       font-size: 18px;
     }
     .operation-confirm-card {
-      width: min(100%, 480px);
+      width: min(100%, 680px);
     }
     .operation-confirm-body {
       display: grid;
@@ -174,6 +174,17 @@
       border-radius: 8px;
       background: #f7faf8;
       line-height: 1.6;
+    }
+    .operation-confirm-details {
+      display: grid;
+      gap: 4px;
+    }
+    .operation-confirm-detail-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .operation-confirm-detail-scroll .summary-detail {
+      margin-top: 0;
     }
     .confirm-grid {
       display: grid;
@@ -1853,12 +1864,22 @@
       const locationText = kind === 'moveDone'
         ? operationLocationLabel(state.selectedLocations.move)
         : currentStorageDetailLabel(pallet);
+      const details = detailsFor(pallet.palletNo);
       state.pendingOperation = kind;
       $('operationConfirmTitle').textContent = config.title;
       $('operationConfirmBody').innerHTML = `
         <div><strong>パレット番号:</strong> ${esc(pallet.palletNo)}</div>
+        <div><strong>状態:</strong> ${esc(pallet.status || '')}</div>
         <div><strong>${esc(config.locationLabel)}:</strong> ${esc(locationText)}</div>
         <div><strong>重量:</strong> ${num(pallet.weight)}kg</div>
+        <div><strong>登録日時:</strong> ${esc(pallet.registeredAt || '')}</div>
+        <div><strong>備考:</strong> ${esc(pallet.memo || '')}</div>
+        <div class="operation-confirm-details">
+          <strong>明細</strong>
+          <div class="operation-confirm-detail-scroll">
+            ${details.length ? detailSummaryTable(details) : '<div class="muted">明細なし</div>'}
+          </div>
+        </div>
       `;
       $('operationConfirmModal').classList.remove('hidden');
       $('operationConfirmOkBtn').focus();
