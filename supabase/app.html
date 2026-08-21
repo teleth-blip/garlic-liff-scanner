@@ -804,21 +804,10 @@
       gap: 5px;
       min-width: 0;
     }
-    .search-filter > label {
-      display: block;
-    }
-    .search-input-clear {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 44px;
-      gap: 4px;
-    }
-    .search-clear-button {
-      width: 44px;
-      padding: 0;
-    }
-    .search-clear-button svg {
-      width: 19px;
-      height: 19px;
+    .search-filter-label {
+      color: #344139;
+      font-size: 13px;
+      font-weight: 700;
     }
     .search-total {
       display: grid;
@@ -1452,18 +1441,12 @@
     <section id="searchPanel" class="panel hidden" data-panel="search">
       <div class="search-controls">
         <div class="search-filter">
-          <label for="searchProducer">生産者</label>
-          <div class="search-input-clear">
-            <input id="searchProducer" list="searchProducerOptions" autocomplete="off" placeholder="番号・名前">
-            <button type="button" class="secondary search-clear-button" data-clear-search="searchProducer" aria-label="生産者をクリア" title="生産者をクリア" disabled><i data-lucide="x"></i></button>
-          </div>
+          <span class="search-filter-label">生産者</span>
+          <input id="searchProducer" list="searchProducerOptions" autocomplete="off" placeholder="番号・名前" aria-label="生産者">
         </div>
         <div class="search-filter">
-          <label for="searchStandard">規格</label>
-          <div class="search-input-clear">
-            <input id="searchStandard" list="searchStandardOptions" autocomplete="off">
-            <button type="button" class="secondary search-clear-button" data-clear-search="searchStandard" aria-label="規格をクリア" title="規格をクリア" disabled><i data-lucide="x"></i></button>
-          </div>
+          <span class="search-filter-label">規格</span>
+          <input id="searchStandard" list="searchStandardOptions" autocomplete="off" aria-label="規格">
         </div>
         <label>冷蔵庫
           <select id="searchCooler"></select>
@@ -1746,11 +1729,13 @@
       $('searchPallet').addEventListener('input', handleInventorySearch);
       ['searchProducer', 'searchStandard', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
       ['searchCooler', 'searchStatus'].forEach(id => $(id).addEventListener('change', renderSearch));
-      document.querySelectorAll('[data-clear-search]').forEach(button => button.addEventListener('click', () => {
-        const input = $(button.dataset.clearSearch);
-        input.value = '';
-        renderSearch();
-      }));
+      document.addEventListener('pointerdown', event => {
+        const active = document.activeElement;
+        if (!active || !['searchProducer', 'searchStandard'].includes(active.id)) return;
+        if (event.target === active) return;
+        active.blur();
+      });
+
       $('producerListSearch').addEventListener('input', () => {
         state.producerListQuery = $('producerListSearch').value.trim();
         renderProducerList();
@@ -3007,13 +2992,6 @@
       el.innerHTML = palletSummaryHtml(pallet, true);
     }
 
-    function updateSearchClearButtons() {
-      document.querySelectorAll('[data-clear-search]').forEach(button => {
-        const input = $(button.dataset.clearSearch);
-        button.disabled = !input || !cleanText(input.value);
-      });
-    }
-
     function renderSearch() {
       if (!state.data) return;
       const rows = searchDetailRows();
@@ -3023,7 +3001,6 @@
         : '<div class="search-empty">該当する明細がありません。</div>';
       container.innerHTML = searchTotalHtml(rows) + result;
       if (rows.length) bindSearchDetailActions(container);
-      updateSearchClearButtons();
     }
 
     function searchTotalHtml(rows) {
