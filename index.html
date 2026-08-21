@@ -2564,11 +2564,13 @@
       if (!palletWeightText) return;
       const palletWeight = parseInputNumber(palletWeightText);
       const rows = Array.from($('detailRows').querySelectorAll('tr'));
-      const counts = rows.map(tr => Math.max(0, parseInputNumber(tr.querySelector('[data-detail="memo"]').value)));
+      const countTexts = rows.map(tr => cleanText(tr.querySelector('[data-detail="memo"]').value));
+      const allCountsValid = countTexts.length > 0 && countTexts.every(value => /^\d+$/.test(value) && Number(value) > 0);
+      if (!allCountsValid) return;
+      const counts = countTexts.map(Number);
       const totalContainers = counts.reduce((sum, count) => sum + count, 0);
-      if (!totalContainers) return;
 
-      const weights = counts.map(count => count > 0 ? Math.round(palletWeight * count / totalContainers) : 0);
+      const weights = counts.map(count => Math.round(palletWeight * count / totalContainers));
       const roundedTotal = weights.reduce((sum, weight) => sum + weight, 0);
       const adjustmentIndex = counts.findIndex(count => count > 0);
       weights[adjustmentIndex] += Number((palletWeight - roundedTotal).toFixed(3));
