@@ -422,6 +422,31 @@
       gap: 10px;
       align-items: end;
     }
+    .register-top-fields {
+      display: grid;
+      gap: 8px;
+    }
+    .register-top-row {
+      display: grid;
+      gap: 6px;
+      align-items: end;
+    }
+    .register-top-row.primary {
+      grid-template-columns: .78fr 1.35fr 1fr;
+    }
+    .register-top-row.secondary {
+      grid-template-columns: .85fr .95fr 1.3fr;
+    }
+    .register-top-row label {
+      min-width: 0;
+      font-size: 12px;
+    }
+    .register-top-row input,
+    .register-top-row select {
+      min-width: 0;
+      padding-right: 7px;
+      padding-left: 7px;
+    }
     .memo-row {
       display: grid;
       grid-template-columns: minmax(160px, 1fr) auto;
@@ -1221,27 +1246,34 @@
   <div id="palletConfirmModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
     <div class="app-modal-card">
       <h2 id="registerTitle">パレット登録</h2>
-      <div class="form-grid">
-        <label>年産
-          <input id="regYear" inputmode="numeric" autocomplete="off">
-        </label>
-        <label>パレット番号
-          <input id="regPalletNo" placeholder="空欄なら自動採番">
-        </label>
-        <label>パレット重量
-          <input id="regWeight" inputmode="decimal">
-        </label>
-        <label>状態
-          <select id="regStatus" disabled>
-            <option value="未配置">未配置</option>
-            <option value="保管中">保管中</option>
-            <option value="仮移動中">仮移動中</option>
-            <option value="出庫済">出庫済</option>
-          </select>
-        </label>
-        <label>備考
-          <input id="regMemo">
-        </label>
+      <div class="register-top-fields">
+        <div class="register-top-row primary">
+          <label>年産
+            <input id="regYear" inputmode="numeric" autocomplete="off">
+          </label>
+          <label>パレット番号
+            <input id="regPalletNo" placeholder="自動採番">
+          </label>
+          <label>状態
+            <select id="regStatus" disabled>
+              <option value="未配置">未配置</option>
+              <option value="保管中">保管中</option>
+              <option value="仮移動中">仮移動中</option>
+              <option value="出庫済">出庫済</option>
+            </select>
+          </label>
+        </div>
+        <div class="register-top-row secondary">
+          <label>重量
+            <input id="regWeight" inputmode="decimal">
+          </label>
+          <label>コンテナ数
+            <input id="regContainerCount" inputmode="numeric" readonly>
+          </label>
+          <label>備考
+            <input id="regMemo">
+          </label>
+        </div>
       </div>
       <h3>明細</h3>
       <div class="table-wrap register-detail-wrap">
@@ -2386,12 +2418,13 @@
         if (producer) producerSearch.value = producerChoiceDisplay(producer);
       });
       tr.querySelector('[data-detail="weight"]').addEventListener('input', updateRegisterWeight);
-      tr.querySelector('[data-detail="memo"]').addEventListener('input', distributeDetailWeightsByContainerCount);
+      tr.querySelector('[data-detail="memo"]').addEventListener('input', handleDetailContainerCountChange);
       tr.querySelector('button').addEventListener('click', () => {
         tr.remove();
-        distributeDetailWeightsByContainerCount();
+        handleDetailContainerCountChange();
       });
       $('detailRows').appendChild(tr);
+      updateRegisterContainerCount();
     }
 
     function standardOptions(selected) {
@@ -2496,6 +2529,7 @@
       $('regStatus').value = '未配置';
       $('regStatus').disabled = true;
       $('regWeight').value = '';
+      $('regContainerCount').value = '';
       $('regMemo').value = '';
       setDefaultYear();
       $('detailRows').innerHTML = '';
@@ -2519,6 +2553,7 @@
       detailsFor(palletNo).forEach(addDetailRow);
       if (!$('detailRows').children.length) addDetailRow();
       $('regWeight').value = pallet.weight || '';
+      updateRegisterContainerCount();
       renderRegisterTable();
       $('palletConfirmModal').classList.remove('hidden');
       $('regYear').focus();
@@ -2580,6 +2615,19 @@
       const total = Array.from($('detailRows').querySelectorAll('[data-detail="weight"]'))
         .reduce((sum, input) => sum + parseInputNumber(input.value), 0);
       $('regWeight').value = total ? formatInputNumber(total) : '';
+    }
+
+    function updateRegisterContainerCount() {
+      const values = Array.from($('detailRows').querySelectorAll('[data-detail="memo"]'))
+        .map(input => cleanText(input.value));
+      const hasValue = values.some(Boolean);
+      const total = values.reduce((sum, value) => sum + parseInputNumber(value), 0);
+      $('regContainerCount').value = hasValue ? formatInputNumber(total) : '';
+    }
+
+    function handleDetailContainerCountChange() {
+      updateRegisterContainerCount();
+      distributeDetailWeightsByContainerCount();
     }
 
     function distributeDetailWeightsByContainerCount() {
