@@ -787,6 +787,31 @@
       font-size: 11px;
       font-weight: 700;
     }
+    .search-total {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f4f8f5;
+    }
+    .search-total-item {
+      display: grid;
+      gap: 2px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .search-total-item + .search-total-item {
+      border-left: 1px solid var(--line);
+    }
+    .search-total-item span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .search-total-item strong {
+      font-size: 18px;
+    }
     .search-detail-table {
       border-top: 1px solid var(--line);
       overflow-x: auto;
@@ -2872,12 +2897,25 @@
       if (!state.data) return;
       const rows = searchDetailRows();
       const container = $('searchResults');
-      if (!rows.length) {
-        container.innerHTML = '<div class="search-empty">該当する明細がありません。</div>';
-        return;
-      }
-      container.innerHTML = searchDetailTable(rows);
-      bindSearchDetailActions(container);
+      const result = rows.length
+        ? searchDetailTable(rows)
+        : '<div class="search-empty">該当する明細がありません。</div>';
+      container.innerHTML = searchTotalHtml(rows) + result;
+      if (rows.length) bindSearchDetailActions(container);
+    }
+
+    function searchTotalHtml(rows) {
+      const palletCount = new Set(rows.map(row => row.palletNo).filter(Boolean)).size;
+      const weight = rows.reduce((total, row) => {
+        const value = row.detailNo ? row.weight : (row.pallet && row.pallet.weight);
+        return total + Number(value || 0);
+      }, 0);
+      const containerCount = rows.reduce((total, row) => total + detailContainerCountNumber(row), 0);
+      return `<div class="search-total">
+        <div class="search-total-item"><span>パレット</span><strong>${num(palletCount)}枚</strong></div>
+        <div class="search-total-item"><span>重量</span><strong>${num(weight)}kg</strong></div>
+        <div class="search-total-item"><span>コンテナ数</span><strong>${num(containerCount)}</strong></div>
+      </div>`;
     }
 
     function searchDetailRows() {
