@@ -515,9 +515,12 @@
       background: #fff;
     }
     .register-detail-wrap {
-      min-height: min(38vh, 340px);
-      max-height: min(62vh, 560px);
-      touch-action: pan-y;
+      min-height: 0;
+      max-height: none;
+      overflow-x: auto;
+      overflow-y: visible;
+      overscroll-behavior: auto;
+      touch-action: pan-x pan-y;
     }
     #detailTable {
       min-width: 620px;
