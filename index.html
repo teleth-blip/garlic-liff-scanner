@@ -186,6 +186,12 @@
     .operation-confirm-detail-scroll .summary-detail {
       margin-top: 0;
     }
+    .inventory-pallet-card {
+      width: min(100%, 680px);
+    }
+    .inventory-pallet-card .pallet-summary {
+      margin-top: 0;
+    }
     .confirm-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1242,6 +1248,15 @@
       </div>
     </div>
   </div>
+  <div id="inventoryPalletModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="inventoryPalletModalTitle">
+    <div class="app-modal-card inventory-pallet-card">
+      <h2 id="inventoryPalletModalTitle">パレット情報</h2>
+      <div id="checkPalletSummary" class="pallet-summary hidden"></div>
+      <div class="action-row modal-actions">
+        <button type="button" id="inventoryPalletCloseBtn" class="secondary">閉じる</button>
+      </div>
+    </div>
+  </div>
   <header class="app-header">
     <div class="header-row">
       <h1>にんにく冷蔵庫管理</h1>
@@ -1427,8 +1442,6 @@
     </section>
 
     <section id="inventoryPanel" class="panel hidden" data-panel="inventory">
-      <h3>パレット情報</h3>
-      <div id="checkPalletSummary" class="pallet-summary hidden"></div>
       <div class="operation-row">
         <label>冷蔵庫
           <select id="checkCooler"></select>
@@ -1691,9 +1704,14 @@
       $('operationConfirmModal').addEventListener('click', event => {
         if (event.target.id === 'operationConfirmModal') closeOperationConfirm();
       });
+      $('inventoryPalletCloseBtn').addEventListener('click', closeInventoryPalletModal);
+      $('inventoryPalletModal').addEventListener('click', event => {
+        if (event.target.id === 'inventoryPalletModal') closeInventoryPalletModal();
+      });
       document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && !$('palletConfirmModal').classList.contains('hidden')) closePalletConfirm();
         if (event.key === 'Escape' && !$('operationConfirmModal').classList.contains('hidden')) closeOperationConfirm();
+        if (event.key === 'Escape' && !$('inventoryPalletModal').classList.contains('hidden')) closeInventoryPalletModal();
       });
       ['focus', 'click', 'pointerdown'].forEach(type => {
         $('qrLeftNo').addEventListener(type, () => renderPalletSuggestions('qrLeftNo', 'left'));
@@ -2999,6 +3017,7 @@
       renderCheckGrid();
       renderInventoryRows();
       renderInventoryPallet();
+      openInventoryPalletModal();
     }
 
     function renderInventoryPallet() {
@@ -3007,10 +3026,21 @@
       if (!pallet) {
         el.classList.add('hidden');
         el.innerHTML = '';
+        closeInventoryPalletModal();
         return;
       }
       el.classList.remove('hidden');
       el.innerHTML = palletSummaryHtml(pallet, true);
+    }
+
+    function openInventoryPalletModal() {
+      if (!findPallet(state.inventorySelectedPalletNo)) return;
+      $('inventoryPalletModal').classList.remove('hidden');
+      $('inventoryPalletCloseBtn').focus();
+    }
+
+    function closeInventoryPalletModal() {
+      $('inventoryPalletModal').classList.add('hidden');
     }
 
     function renderSearch() {
