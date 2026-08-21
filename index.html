@@ -2397,6 +2397,7 @@
       const details = detailsFor(palletNo);
       const hasContainerCount = details.some(detail => detailContainerCountText(detail) !== '');
       if (!hasContainerCount) return '';
+      if (details.some(detail => detailContainerCountText(detail) === 'スチール')) return 'スチール';
       const total = details.reduce((sum, detail) => sum + detailContainerCountNumber(detail), 0);
       return num(total);
     }
@@ -2630,6 +2631,10 @@
       const values = Array.from($('detailRows').querySelectorAll('[data-detail="memo"]'))
         .map(input => cleanText(input.value));
       const hasValue = values.some(Boolean);
+      if (values.includes('スチール')) {
+        $('regContainerCount').value = 'スチール';
+        return;
+      }
       const total = values.reduce((sum, value) => sum + parseInputNumber(value), 0);
       $('regContainerCount').value = hasValue ? formatInputNumber(total) : '';
     }
