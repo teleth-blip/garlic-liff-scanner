@@ -1393,10 +1393,10 @@
           <input id="searchProducer" autocomplete="off" placeholder="番号・名前">
         </label>
         <label>規格
-          <input id="searchStandard" autocomplete="off">
+          <select id="searchStandard"></select>
         </label>
         <label>冷蔵庫
-          <input id="searchCooler" autocomplete="off" placeholder="冷蔵庫名・ID">
+          <select id="searchCooler"></select>
         </label>
         <label>状態
           <select id="searchStatus">
@@ -1668,8 +1668,8 @@
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
-      ['searchProducer', 'searchStandard', 'searchCooler', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
-      $('searchStatus').addEventListener('change', renderSearch);
+      ['searchProducer', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
+      ['searchStandard', 'searchCooler', 'searchStatus'].forEach(id => $(id).addEventListener('change', renderSearch));
       $('producerListSearch').addEventListener('input', () => {
         state.producerListQuery = $('producerListSearch').value.trim();
         renderProducerList();
@@ -2104,6 +2104,7 @@
 
     function renderSelectors() {
       ['inCooler', 'outCooler', 'moveStartCooler', 'moveCooler', 'checkCooler', 'masterCooler'].forEach(id => renderCoolerOptions(id));
+      renderSearchOptions();
       renderLevelOptions('inLevel', selectedCooler('inCooler'));
       renderLevelOptions('outLevel', selectedCooler('outCooler'));
       renderLevelOptions('moveStartLevel', selectedCooler('moveStartCooler'));
@@ -2111,6 +2112,22 @@
       renderLevelOptions('checkLevel', selectedCooler('checkCooler'));
       renderLevelOptions('masterLevel', selectedCooler('masterCooler'));
       if (!state.masterDraftKey) loadMasterDraft();
+    }
+
+    function renderSearchOptions() {
+      const standardSelect = $('searchStandard');
+      const previousStandard = standardSelect.value;
+      standardSelect.innerHTML = '<option value="">すべて</option>' + activeStandards()
+        .map(standard => `<option value="${esc(standard.standardName)}">${esc(standard.standardName)}</option>`)
+        .join('');
+      if (activeStandards().some(standard => standard.standardName === previousStandard)) standardSelect.value = previousStandard;
+
+      const coolerSelect = $('searchCooler');
+      const previousCooler = coolerSelect.value;
+      coolerSelect.innerHTML = '<option value="">すべて</option>' + activeCoolers()
+        .map(cooler => `<option value="${esc(cooler.coolerId)}">${esc(cooler.coolerName)}</option>`)
+        .join('');
+      if (activeCoolers().some(cooler => cooler.coolerId === previousCooler)) coolerSelect.value = previousCooler;
     }
 
     function renderCoolerOptions(id) {
