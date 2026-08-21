@@ -2475,7 +2475,7 @@
           <div class="qr-title-line">
             <div class="pallet-no">${esc(pallet.palletNo)}</div>
             <div class="qr-weight">${num(pallet.weight)}kg</div>
-            <div class="qr-date">${esc(formatReiwaDate(new Date()))}</div>
+            <div class="qr-date">${esc(formatReiwaDate(pallet.registeredAtRaw || pallet.registeredAt))}</div>
           </div>
           <div class="qr-code">${qrSvg(qrLaunchUrl(pallet.palletNo))}</div>
           <div class="qr-meta">
@@ -2505,7 +2505,9 @@
       return qr.createSvgTag(5, 1);
     }
 
-    function formatReiwaDate(date) {
+    function formatReiwaDate(value) {
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
       const year = date.getFullYear();
       const reiwa = year - 2018;
       return `令和${reiwa}年${date.getMonth() + 1}月${date.getDate()}日`;
@@ -3611,6 +3613,7 @@
         status: row.status || '未配置',
         currentLocationId: locationId,
         currentLocationName: locationNames[locationId] || locationId,
+        registeredAtRaw: row.registered_at || '',
         registeredAt: formatDateTimeText(row.registered_at),
         updatedAt: formatDateTimeText(row.updated_at)
       };
