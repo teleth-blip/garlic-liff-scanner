@@ -163,6 +163,18 @@
       margin: 0 0 12px;
       font-size: 18px;
     }
+    .operation-confirm-card {
+      width: min(100%, 480px);
+    }
+    .operation-confirm-body {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f7faf8;
+      line-height: 1.6;
+    }
     .confirm-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1220,6 +1232,16 @@
     </div>
   </div>
 
+  <div id="operationConfirmModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="operationConfirmTitle">
+    <div class="app-modal-card operation-confirm-card">
+      <h2 id="operationConfirmTitle">操作確認</h2>
+      <div id="operationConfirmBody" class="operation-confirm-body"></div>
+      <div class="action-row modal-actions">
+        <button type="button" id="operationConfirmCancelBtn" class="secondary">キャンセル</button>
+        <button type="button" id="operationConfirmOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
   <header class="app-header">
     <div class="header-row">
       <h1>にんにく冷蔵庫管理 DB版</h1>
@@ -1344,9 +1366,7 @@
         <button type="button" class="secondary unlock-pallet-btn hidden" data-unlock-pallet>固定解除</button>
       </div>
       <div id="outPalletSummary" class="pallet-summary hidden"></div>
-      <div class="action-row">
-        <button type="button" id="outboundBtn">出庫確定</button>
-      </div>
+
       <div id="outGrid" class="location-grid"></div>
     </section>
 
@@ -1376,9 +1396,7 @@
           <button type="button" class="secondary unlock-pallet-btn hidden" data-unlock-pallet>固定解除</button>
         </div>
         <div id="moveStartSummary" class="pallet-summary hidden"></div>
-        <div class="action-row">
-          <button type="button" id="moveStartBtn">仮移動</button>
-        </div>
+
         <div id="moveStartGrid" class="location-grid"></div>
       </div>
       <div id="moveDoneSection" data-move-section="done" class="hidden">
@@ -1402,9 +1420,7 @@
           <button type="button" class="secondary unlock-pallet-btn hidden" data-unlock-pallet>固定解除</button>
         </div>
         <div id="moveDoneSummary" class="pallet-summary hidden"></div>
-        <div class="action-row">
-          <button type="button" id="moveDoneBtn">移動確定</button>
-        </div>
+
         <div id="movingList" class="moving-list"></div>
         <div id="moveGrid" class="location-grid"></div>
       </div>
@@ -1613,6 +1629,7 @@
         pending: {}
       },
       launch: getLaunchParams(),
+      pendingOperation: '',
       launchActionPending: false
     };
 
@@ -1675,8 +1692,14 @@
       $('palletConfirmModal').addEventListener('click', event => {
         if (event.target.id === 'palletConfirmModal') closePalletConfirm();
       });
+      $('operationConfirmCancelBtn').addEventListener('click', closeOperationConfirm);
+      $('operationConfirmOkBtn').addEventListener('click', confirmOperation);
+      $('operationConfirmModal').addEventListener('click', event => {
+        if (event.target.id === 'operationConfirmModal') closeOperationConfirm();
+      });
       document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && !$('palletConfirmModal').classList.contains('hidden')) closePalletConfirm();
+        if (event.key === 'Escape' && !$('operationConfirmModal').classList.contains('hidden')) closeOperationConfirm();
       });
       ['focus', 'click', 'pointerdown'].forEach(type => {
         $('qrLeftNo').addEventListener(type, () => renderPalletSuggestions('qrLeftNo', 'left'));
@@ -1712,15 +1735,12 @@
       $('outCooler').addEventListener('change', () => { renderLevelOptions('outLevel', selectedCooler('outCooler')); state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outLevel').addEventListener('change', () => { state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outPalletNo').addEventListener('input', () => { state.selectedLocations.outbound = ''; renderActionPallet('out'); renderOutboundGrid(); });
-      $('outboundBtn').addEventListener('click', () => withBusy('outboundBtn', '出庫中...', recordOutbound));
       $('moveStartCooler').addEventListener('change', () => { renderLevelOptions('moveStartLevel', selectedCooler('moveStartCooler')); state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartLevel').addEventListener('change', () => { state.selectedLocations.moveStart = ''; renderMoveStartGrid(); });
       $('moveStartPalletNo').addEventListener('input', () => { state.selectedLocations.moveStart = ''; renderActionPallet('moveStart'); renderMoveStartGrid(); });
-      $('moveStartBtn').addEventListener('click', () => withBusy('moveStartBtn', '仮移動中...', startMove));
       $('moveCooler').addEventListener('change', () => { renderLevelOptions('moveLevel', selectedCooler('moveCooler')); state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveLevel').addEventListener('change', () => { state.selectedLocations.move = ''; renderMoveGrid(); });
       $('moveDonePalletNo').addEventListener('input', () => { renderActionPallet('moveDone'); renderMovingList(); });
-      $('moveDoneBtn').addEventListener('click', () => withBusy('moveDoneBtn', '確定中...', completeMove));
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
@@ -1827,6 +1847,63 @@
         wrap.addEventListener(type, () => { drag = null; }, { passive: true });
       });
     }
+    function openOperationConfirm(kind) {
+      if (state.busy) return;
+      const config = {
+        outbound: { title: '出庫確認', palletInput: 'outPalletNo', locationLabel: '現在場所' },
+        moveStart: { title: '仮移動確認', palletInput: 'moveStartPalletNo', locationLabel: '現在場所' },
+        moveDone: { title: '移動確定確認', palletInput: 'moveDonePalletNo', locationLabel: '移動先' }
+      }[kind];
+      if (!config) return;
+      const palletNo = cleanText($(config.palletInput).value);
+      const pallet = findPallet(palletNo);
+      if (!pallet) {
+        showToast('パレットを選択してください。', true);
+        return;
+      }
+      if (kind === 'moveDone' && !state.selectedLocations.move) {
+        showToast('移動先を選択してください。', true);
+        return;
+      }
+      const locationText = kind === 'moveDone'
+        ? operationLocationLabel(state.selectedLocations.move)
+        : currentStorageDetailLabel(pallet);
+      state.pendingOperation = kind;
+      $('operationConfirmTitle').textContent = config.title;
+      $('operationConfirmBody').innerHTML = `
+        <div><strong>パレット番号:</strong> ${esc(pallet.palletNo)}</div>
+        <div><strong>${esc(config.locationLabel)}:</strong> ${esc(locationText)}</div>
+        <div><strong>重量:</strong> ${num(pallet.weight)}kg</div>
+      `;
+      $('operationConfirmModal').classList.remove('hidden');
+      $('operationConfirmOkBtn').focus();
+    }
+
+    function closeOperationConfirm() {
+      state.pendingOperation = '';
+      $('operationConfirmModal').classList.add('hidden');
+    }
+
+    async function confirmOperation() {
+      const kind = state.pendingOperation;
+      const config = {
+        outbound: { busyText: '出庫中...', task: recordOutbound },
+        moveStart: { busyText: '仮移動中...', task: startMove },
+        moveDone: { busyText: '移動確定中...', task: completeMove }
+      }[kind];
+      if (!config) return;
+      closeOperationConfirm();
+      await withBusy('operationConfirmOkBtn', config.busyText, config.task);
+    }
+
+    function operationLocationLabel(locationId) {
+      const location = findLocation(locationId) || parseLocationId(locationId);
+      if (!location) return locationId || '';
+      const cooler = activeCoolers().find(item => item.coolerId === location.coolerId);
+      const coolerName = cooler ? cooler.coolerName : location.coolerId;
+      return `${coolerName} / ${location.row}行 / ${location.col}列 / ${location.level}段目`;
+    }
+
     async function withBusy(buttonId, busyText, task) {
       if (state.busy) return;
       const btn = $(buttonId);
@@ -2642,6 +2719,7 @@
       container.querySelectorAll('[data-location]').forEach(btn => btn.addEventListener('click', () => {
         state.selectedLocations[kind] = btn.dataset.location;
         kind === 'inbound' ? renderInboundGrid() : renderMoveGrid();
+        if (kind === 'move' && cleanText($('moveDonePalletNo').value)) openOperationConfirm('moveDone');
       }));
     }
 
@@ -2677,6 +2755,7 @@
         $(inputId).value = btn.dataset.removePallet || '';
         renderActionPallet(kind === 'outbound' ? 'out' : 'moveStart');
         kind === 'outbound' ? renderOutboundGrid() : renderMoveStartGrid();
+        openOperationConfirm(kind === 'outbound' ? 'outbound' : 'moveStart');
       }));
     }
 
@@ -2730,6 +2809,7 @@
         $('moveDonePalletNo').value = btn.dataset.movingPallet;
         renderActionPallet('moveDone');
         renderMovingList();
+        if (state.selectedLocations.move) openOperationConfirm('moveDone');
       }));
     }
 
