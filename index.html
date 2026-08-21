@@ -3005,12 +3005,15 @@
 
     function searchDetailTable(rows) {
       return `<div class="search-detail-table"><table>
-        <thead><tr><th>パレット</th><th>状態</th><th>保管場所</th><th>生産者</th><th>規格</th><th>重量</th><th>コンテナ数</th><th>操作</th></tr></thead>
+        <thead><tr><th>パレット</th><th>状態</th><th>冷蔵庫名</th><th>行</th><th>列</th><th>段数</th><th>生産者</th><th>規格</th><th>重量</th><th>コンテナ数</th><th>操作</th></tr></thead>
         <tbody>${rows.map(row => `
           <tr data-search-pallet="${esc(row.palletNo)}">
             <td>${esc(row.palletNo)}</td>
             <td>${esc(row.palletStatus)}</td>
-            <td>${esc(row.storageLabel)}</td>
+            <td>${esc(row.coolerName)}</td>
+            <td>${row.location ? num(row.location.row) : ''}</td>
+            <td>${row.location ? num(row.location.col) : ''}</td>
+            <td>${row.location ? `${num(row.location.level)}段目` : ''}</td>
             <td>${esc(row.producerText)}</td>
             <td>${esc(row.standard)}</td>
             <td>${num(row.weight)}</td>
