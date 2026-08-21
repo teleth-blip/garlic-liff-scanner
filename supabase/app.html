@@ -3808,11 +3808,19 @@
     }
 
     async function selectAll(table, configure) {
-      let query = supabaseClient.from(table).select('*');
-      if (configure) query = configure(query);
-      const { data, error } = await query;
-      if (error) throw new Error(`${table}: ${error.message}`);
-      return data || [];
+      const pageSize = 1000;
+      const rows = [];
+      for (let from = 0; ; from += pageSize) {
+        let query = supabaseClient.from(table).select('*');
+        if (configure) query = configure(query);
+        query = query.range(from, from + pageSize - 1);
+        const { data, error } = await query;
+        if (error) throw new Error(`${table}: ${error.message}`);
+        const page = data || [];
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
+      return rows;
     }
 
     async function optionalSelectAll(table, configure) {
@@ -4265,7 +4273,8 @@
             row,
             col,
             displayName: `R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}`,
-            available: true
+            available: false,
+            note: '保管場所マスタ未登録'
           });
         }
       }
