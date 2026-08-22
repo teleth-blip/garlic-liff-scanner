@@ -1557,6 +1557,9 @@
       </div>
       <datalist id="searchProducerOptions"></datalist>
       <datalist id="searchStandardOptions"></datalist>
+      <div class="action-row">
+        <button type="button" id="searchPdfBtn"><i data-lucide="file-text"></i><span>一覧表PDF</span></button>
+      </div>
       <div id="searchResults"></div>
     </section>
     <section id="masterPanel" class="panel hidden" data-panel="master">
@@ -1832,6 +1835,7 @@
       $('searchPallet').addEventListener('input', handleInventorySearch);
       ['searchProducer', 'searchStandard', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
       ['searchCooler', 'searchStatus'].forEach(id => $(id).addEventListener('change', renderSearch));
+      $('searchPdfBtn').addEventListener('click', openSearchWeightPdf);
       document.addEventListener('pointerdown', event => {
         const active = document.activeElement;
         if (!active || !['searchProducer', 'searchStandard'].includes(active.id)) return;
@@ -3278,6 +3282,107 @@
           && includes(row.palletNo, filters.palletNo);
       }).sort((a, b) => a.palletNo.localeCompare(b.palletNo, 'ja') || a.detailNo - b.detailNo);
     }
+
+    function openSearchWeightPdf() {
+      const matrix = buildSearchWeightMatrix(searchDetailRows());
+      if (!matrix.rows.length || !matrix.coolers.length) {
+        showToast('PDFに集計できる保管中の明細がありません。', true);
+        return;
+      }
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        showToast('印刷ページを開けませんでした。ポップアップを許可してください。', true);
+        return;
+      }
+      const headerCells = matrix.coolers.map(cooler => `<th>${esc(cooler.coolerName)}</th>`).join('');
+      const bodyRows = matrix.rows.map(row => `<tr>
+        <th>${esc(row.standardName)}</th>
+        ${matrix.coolers.map(cooler => `<td>${num(row.weights[cooler.coolerId] || 0)}</td>`).join('')}
+        <td class="total">${num(row.total)}</td>
+      </tr>`).join('');
+      const footerCells = matrix.coolers.map(cooler => `<td>${num(matrix.coolerTotals[cooler.coolerId] || 0)}</td>`).join('');
+      const createdAt = new Date().toLocaleString('ja-JP');
+      printWindow.document.open();
+      printWindow.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>冷蔵庫別 規格重量一覧</title>
+        <style>
+          @page { size: A4 portrait; margin: 12mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #000; background: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+          .toolbar { display: flex; gap: 8px; margin: 0 0 12px; }
+          button { min-height: 40px; padding: 8px 14px; border: 1px solid #444; background: #fff; color: #000; font-weight: 700; }
+          h1 { margin: 0; font-size: 18px; text-align: center; }
+          .meta { display: flex; justify-content: space-between; margin: 5px 0 8px; font-size: 9px; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+          th, td { border: 1px solid #000; padding: 4px 3px; }
+          thead th, tfoot th, tfoot td, td.total { font-weight: 800; }
+          th { text-align: center; overflow-wrap: anywhere; }
+          tbody th { width: 24%; text-align: left; }
+          td { text-align: right; }
+          @media print { .toolbar { display: none; } }
+        </style></head><body>
+        <div class="toolbar"><button type="button" onclick="window.print()">印刷・PDF保存</button><button type="button" onclick="window.close()">閉じる</button></div>
+        <h1>冷蔵庫別 規格重量一覧</h1>
+        <div class="meta"><span>単位：kg</span><span>作成日時：${esc(createdAt)}</span></div>
+        <table><thead><tr><th>規格名</th>${headerCells}<th>合計</th></tr></thead>
+        <tbody>${bodyRows}</tbody>
+        <tfoot><tr><th>合計</th>${footerCells}<td>${num(matrix.grandTotal)}</td></tr></tfoot></table>
+        </body></html>`);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 250);
+    }
+
+    function buildSearchWeightMatrix(rows) {
+      const standards = (state.data && state.data.master.standards) || [];
+      const standardsById = new Map(standards.map(standard => [cleanText(standard.standardId), standard]));
+      const standardsByName = new Map();
+      standards.forEach(standard => {
+        const name = cleanText(standard.standardName || standard.standardId);
+        if (name && !standardsByName.has(name)) standardsByName.set(name, standard);
+      });
+      const coolers = (state.data && state.data.master.coolers) || [];
+      const coolersById = new Map(coolers.map((cooler, index) => [cooler.coolerId, { ...cooler, sourceOrder: index }]));
+      const usedCoolerIds = new Set();
+      const groups = new Map();
+      rows.forEach(row => {
+        const coolerId = cleanText(row.location && row.location.coolerId);
+        if (!coolerId) return;
+        usedCoolerIds.add(coolerId);
+        const rawStandard = cleanText(row.standard);
+        const standard = standardsById.get(rawStandard) || standardsByName.get(rawStandard) || null;
+        const standardName = cleanText(standard && (standard.standardName || standard.standardId)) || rawStandard || '(規格なし)';
+        const displayOrder = standard ? Number(standard.displayOrder || 0) : Number.MAX_SAFE_INTEGER;
+        if (!groups.has(standardName)) {
+          groups.set(standardName, { standardName, displayOrder, weights: {}, total: 0 });
+        }
+        const group = groups.get(standardName);
+        group.displayOrder = Math.min(group.displayOrder, displayOrder);
+        const weight = Number(row.detailNo ? row.weight : (row.pallet && row.pallet.weight)) || 0;
+        group.weights[coolerId] = (group.weights[coolerId] || 0) + weight;
+        group.total += weight;
+      });
+      const matrixCoolers = Array.from(usedCoolerIds).map(coolerId => {
+        return coolersById.get(coolerId) || { coolerId, coolerName: coolerId, sourceOrder: Number.MAX_SAFE_INTEGER };
+      }).sort((a, b) => a.sourceOrder - b.sourceOrder || a.coolerName.localeCompare(b.coolerName, 'ja'));
+      const matrixRows = Array.from(groups.values()).sort((a, b) => {
+        return a.displayOrder - b.displayOrder || a.standardName.localeCompare(b.standardName, 'ja');
+      });
+      const coolerTotals = {};
+      matrixCoolers.forEach(cooler => {
+        coolerTotals[cooler.coolerId] = matrixRows.reduce((total, row) => total + Number(row.weights[cooler.coolerId] || 0), 0);
+      });
+      return {
+        coolers: matrixCoolers,
+        rows: matrixRows,
+        coolerTotals,
+        grandTotal: matrixRows.reduce((total, row) => total + row.total, 0)
+      };
+    }
+
     function groupSearchRows(rows, keyFn, metaFn) {
       const groups = new Map();
       rows.forEach(row => {
