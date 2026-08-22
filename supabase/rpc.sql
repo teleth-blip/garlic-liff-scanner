@@ -633,15 +633,12 @@ begin
   for v_row in select value from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb))
   loop
     v_id := btrim(coalesce(v_row->>'standardId', ''));
-    v_name := btrim(coalesce(v_row->>'standardName', ''));
+    v_name := v_id;
     if v_id = '' and v_name = '' then
       continue;
     end if;
     if v_id = '' then
       raise exception '規格IDを入力してください。';
-    end if;
-    if v_name = '' then
-      raise exception '規格名を入力してください: %', v_id;
     end if;
     v_order := case when btrim(coalesce(v_row->>'displayOrder', '')) ~ '^\d+$'
       then (v_row->>'displayOrder')::integer else 999 end;

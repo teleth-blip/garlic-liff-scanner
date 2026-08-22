@@ -32,7 +32,7 @@ $mig$[{"workerId":"米田歩","workerName":"作業者","role":"operator","displa
 insert into public.standards (standard_id, standard_name, display_order, active)
 select
   x."standardId",
-  coalesce(nullif(x."standardName", ''), x."standardId"),
+  x."standardId",
   coalesce(x."displayOrder", 0),
   coalesce(x.active, true)
 from jsonb_to_recordset(

@@ -192,10 +192,10 @@ insert into public.workers (worker_id, worker_name, role, display_order, active,
 on conflict (worker_id) do nothing;
 
 insert into public.standards (standard_id, standard_name, display_order, active) values
-  ('STD-2L', '2L', 10, true),
-  ('STD-L', 'L', 20, true),
-  ('STD-M', 'M', 30, true),
-  ('STD-S', 'S', 40, true)
+  ('2L', '2L', 10, true),
+  ('L', 'L', 20, true),
+  ('M', 'M', 30, true),
+  ('S', 'S', 40, true)
 on conflict (standard_id) do nothing;
 
 insert into public.coolers (cooler_id, cooler_name, max_levels, row_count, col_count, active) values

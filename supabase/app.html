@@ -1576,7 +1576,7 @@
         <summary>規格マスタ</summary>
         <div class="master-body">
           <div class="table-wrap">
-            <table><thead><tr><th>ID</th><th>規格名</th><th>表示順</th><th>有効</th><th></th></tr></thead><tbody id="standardRows"></tbody></table>
+            <table><thead><tr><th>規格</th><th>表示順</th><th>有効</th><th></th></tr></thead><tbody id="standardRows"></tbody></table>
           </div>
           <div class="action-row">
             <button type="button" id="addStandardBtn" class="secondary">追加</button>
@@ -2350,7 +2350,7 @@
         .map(producer => `<option value="${esc(producerChoiceDisplay(producer))}"></option>`)
         .join('');
       $('searchStandardOptions').innerHTML = activeStandards()
-        .map(standard => `<option value="${esc(standard.standardName)}"></option>`)
+        .map(standard => `<option value="${esc(standard.standardId)}"></option>`)
         .join('');
 
       const coolerSelect = $('searchCooler');
@@ -2444,7 +2444,7 @@
     }
 
     function standardOptions(selected) {
-      return activeStandards().map(s => `<option value="${esc(s.standardName)}" ${s.standardName === selected ? 'selected' : ''}>${esc(s.standardName)}</option>`).join('');
+      return activeStandards().map(s => `<option value="${esc(s.standardId)}" ${s.standardId === selected ? 'selected' : ''}>${esc(s.standardId)}</option>`).join('');
     }
 
     function renderProducerOptions() {
@@ -3472,7 +3472,6 @@
     function standardRowHtml(row = {}) {
       return `<tr>
         <td><input data-field="standardId" value="${esc(row.standardId || '')}"></td>
-        <td><input data-field="standardName" value="${esc(row.standardName || '')}"></td>
         <td><input data-field="displayOrder" inputmode="numeric" value="${esc(row.displayOrder || '')}"></td>
         <td><input data-field="active" type="checkbox" ${row.active !== false ? 'checked' : ''}></td>
         <td><button type="button" class="secondary small" data-remove-row>削除</button></td>
@@ -3485,7 +3484,21 @@
     }
 
     async function saveStandards() {
-      await saveRows('saveStandards', 'standardRows');
+      try {
+        const rows = Array.from($('standardRows').querySelectorAll('tr')).map(row => {
+          const standardId = cleanText(row.querySelector('[data-field="standardId"]').value);
+          return {
+            standardId,
+            standardName: standardId,
+            displayOrder: row.querySelector('[data-field="displayOrder"]').value,
+            active: row.querySelector('[data-field="active"]').checked
+          };
+        });
+        const res = await api('saveStandards', { rows });
+        applyDataResponse(res);
+      } catch (error) {
+        showToast(error.message, true);
+      }
     }
 
     function renderCoolerRows() {
@@ -3918,7 +3931,6 @@
     function mapStandard(row) {
       return {
         standardId: row.standard_id,
-        standardName: row.standard_name || row.standard_id,
         displayOrder: toNumber(row.display_order),
         active: row.active !== false
       };
