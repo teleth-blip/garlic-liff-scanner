@@ -1364,7 +1364,7 @@
       <h3>登録済みパレット</h3>
       <div class="table-wrap">
         <table class="register-list-table">
-          <thead><tr><th>パレット</th><th>状態</th><th>規格</th><th>重量</th><th>場所</th><th>コンテナ数</th><th>操作</th></tr></thead>
+          <thead><tr><th>パレット</th><th>状態</th><th>規格</th><th>重量</th><th>コンテナ数</th><th>場所</th><th>操作</th></tr></thead>
           <tbody id="registeredPalletRows"></tbody>
         </table>
       </div>
@@ -2383,8 +2383,8 @@
           <td>${esc(p.status)}</td>
           <td>${esc(standardIdsForPallet(p.palletNo))}</td>
           <td>${num(p.weight)}</td>
-          <td class="register-location-cell">${esc(currentStorageLabel(p))}</td>
           <td>${esc(palletContainerCountText(p.palletNo))}</td>
+          <td class="register-location-cell">${esc(currentStorageLabel(p))}</td>
           <td>
             <button type="button" class="danger small" data-delete-pallet="${esc(p.palletNo)}">削除</button>
           </td>
