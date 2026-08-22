@@ -578,12 +578,12 @@
       width: auto;
       white-space: nowrap;
     }
-    .register-list-table th:nth-child(4),
-    .register-list-table td:nth-child(4),
     .register-list-table th:nth-child(5),
-    .register-list-table td:nth-child(5) { text-align: right; }
-    .register-list-table th:nth-child(7),
-    .register-list-table td:nth-child(7) { text-align: center; }
+    .register-list-table td:nth-child(5),
+    .register-list-table th:nth-child(6),
+    .register-list-table td:nth-child(6) { text-align: right; }
+    .register-list-table th:nth-child(8),
+    .register-list-table td:nth-child(8) { text-align: center; }
     .register-location-cell {
       max-width: 150px;
       white-space: normal;
@@ -1362,7 +1362,7 @@
       <h3>登録済みパレット</h3>
       <div class="table-wrap">
         <table class="register-list-table">
-          <thead><tr><th>パレット</th><th>状態</th><th>規格</th><th>重量</th><th>コンテナ数</th><th>場所</th><th>操作</th></tr></thead>
+          <thead><tr><th>パレット</th><th>状態</th><th>生産者</th><th>規格</th><th>重量</th><th>コンテナ数</th><th>場所</th><th>操作</th></tr></thead>
           <tbody id="registeredPalletRows"></tbody>
         </table>
       </div>
@@ -2379,6 +2379,7 @@
         <tr class="selectable-row ${p.palletNo === state.editPalletNo ? 'selected' : ''}" data-edit-pallet="${esc(p.palletNo)}">
           <td>${esc(p.palletNo)}</td>
           <td>${esc(p.status)}</td>
+          <td>${esc(producerNosForPallet(p.palletNo))}</td>
           <td>${esc(standardIdsForPallet(p.palletNo))}</td>
           <td>${num(p.weight)}</td>
           <td>${esc(palletContainerCountText(p.palletNo))}</td>
