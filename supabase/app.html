@@ -823,10 +823,32 @@
     }
     .search-controls {
       display: grid;
-      grid-template-columns: repeat(5, minmax(120px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-areas:
+        "producer producer producer producer pallet pallet"
+        "standard standard cooler cooler status status";
+      gap: 6px;
       align-items: end;
+      width: 100%;
+      max-width: 760px;
       margin-bottom: 10px;
+    }
+    .search-producer-filter { grid-area: producer; }
+    .search-pallet-filter { grid-area: pallet; }
+    .search-standard-filter { grid-area: standard; }
+    .search-cooler-filter { grid-area: cooler; }
+    .search-status-filter { grid-area: status; }
+    .search-controls label,
+    .search-controls .search-filter {
+      min-width: 0;
+    }
+    .search-controls input,
+    .search-controls select {
+      width: 100%;
+      min-width: 0;
+      min-height: 38px;
+      padding: 6px 8px;
+      font-size: 13px;
     }
     .search-groups {
       display: grid;
@@ -953,9 +975,6 @@
     @media (max-width: 720px) {
       .search-group > summary {
         grid-template-columns: 1fr 1fr;
-      }
-      .search-controls {
-        grid-template-columns: 1fr;
       }
       .search-group > summary::after {
         grid-column: 2;
@@ -1531,18 +1550,22 @@
     </section>
     <section id="searchPanel" class="panel hidden" data-panel="search">
       <div class="search-controls">
-        <div class="search-filter">
+        <div class="search-filter search-producer-filter">
           <span class="search-filter-label">生産者</span>
           <input id="searchProducer" list="searchProducerOptions" autocomplete="off" placeholder="番号・名前" aria-label="生産者">
         </div>
-        <div class="search-filter">
+        <div class="search-filter search-pallet-filter">
+          <span class="search-filter-label">パレット番号</span>
+          <input id="searchPalletNo" list="searchPalletOptions" autocomplete="off" aria-label="パレット番号">
+        </div>
+        <div class="search-filter search-standard-filter">
           <span class="search-filter-label">規格</span>
           <input id="searchStandard" list="searchStandardOptions" autocomplete="off" aria-label="規格">
         </div>
-        <label>冷蔵庫
+        <label class="search-cooler-filter">冷蔵庫
           <select id="searchCooler"></select>
         </label>
-        <label>状態
+        <label class="search-status-filter">状態
           <select id="searchStatus">
             <option value="">すべて</option>
             <option value="未配置">未配置</option>
@@ -1551,11 +1574,9 @@
             <option value="出庫済">出庫済</option>
           </select>
         </label>
-        <label>パレット番号
-          <input id="searchPalletNo" autocomplete="off">
-        </label>
       </div>
       <datalist id="searchProducerOptions"></datalist>
+      <datalist id="searchPalletOptions"></datalist>
       <datalist id="searchStandardOptions"></datalist>
       <div class="action-row">
         <button type="button" id="searchPdfBtn"><i data-lucide="file-text"></i><span>一覧表PDF</span></button>
@@ -2360,6 +2381,9 @@
         .join('');
       $('searchStandardOptions').innerHTML = activeStandards()
         .map(standard => `<option value="${esc(standard.standardId)}"></option>`)
+        .join('');
+      $('searchPalletOptions').innerHTML = registeredPalletsNewestFirst()
+        .map(pallet => `<option value="${esc(pallet.palletNo)}">${esc(pallet.status)}</option>`)
         .join('');
 
       const coolerSelect = $('searchCooler');
