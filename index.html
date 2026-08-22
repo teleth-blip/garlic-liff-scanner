@@ -1364,7 +1364,7 @@
       <h3>登録済みパレット</h3>
       <div class="table-wrap">
         <table class="register-list-table">
-          <thead><tr><th>パレット</th><th>状態</th><th>重量</th><th>場所</th><th>コンテナ数</th><th>操作</th></tr></thead>
+          <thead><tr><th>パレット</th><th>状態</th><th>規格</th><th>重量</th><th>場所</th><th>コンテナ数</th><th>操作</th></tr></thead>
           <tbody id="registeredPalletRows"></tbody>
         </table>
       </div>
@@ -2381,6 +2381,7 @@
         <tr class="selectable-row ${p.palletNo === state.editPalletNo ? 'selected' : ''}" data-edit-pallet="${esc(p.palletNo)}">
           <td>${esc(p.palletNo)}</td>
           <td>${esc(p.status)}</td>
+          <td>${esc(standardIdsForPallet(p.palletNo))}</td>
           <td>${num(p.weight)}</td>
           <td class="register-location-cell">${esc(currentStorageLabel(p))}</td>
           <td>${esc(palletContainerCountText(p.palletNo))}</td>
@@ -4273,6 +4274,9 @@
     function detailsFor(palletNo) { return state.data ? state.data.details.filter(d => d.palletNo === palletNo).sort((a, b) => a.detailNo - b.detailNo) : []; }
     function producerNosForPallet(palletNo) {
       return [...new Set(detailsFor(palletNo).map(d => cleanText(d.producerNo)).filter(Boolean))].join(' / ');
+    }
+    function standardIdsForPallet(palletNo) {
+      return [...new Set(detailsFor(palletNo).map(d => cleanText(d.standard)).filter(Boolean))].join(' / ');
     }
     function cleanText(value) { return String(value || '').trim(); }
     function selectedCooler(selectId) { const id = $(selectId).value; return activeCoolers().find(c => c.coolerId === id) || activeCoolers()[0] || null; }
