@@ -2350,7 +2350,7 @@
         .map(producer => `<option value="${esc(producerChoiceDisplay(producer))}"></option>`)
         .join('');
       $('searchStandardOptions').innerHTML = activeStandards()
-        .map(standard => `<option value="${esc(standard.standardName)}"></option>`)
+        .map(standard => `<option value="${esc(standard.standardId)}"></option>`)
         .join('');
 
       const coolerSelect = $('searchCooler');
@@ -2444,7 +2444,7 @@
     }
 
     function standardOptions(selected) {
-      return activeStandards().map(s => `<option value="${esc(s.standardName)}" ${s.standardName === selected ? 'selected' : ''}>${esc(s.standardName)}</option>`).join('');
+      return activeStandards().map(s => `<option value="${esc(s.standardId)}" ${s.standardId === selected ? 'selected' : ''}>${esc(s.standardId)}</option>`).join('');
     }
 
     function renderProducerOptions() {
