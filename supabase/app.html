@@ -3006,9 +3006,28 @@
     }
 
     async function recordInbound() {
+      let resetFromShipped = false;
       try {
+        const palletNo = cleanText($('inPalletNo').value);
+        const pallet = findPallet(palletNo);
+        if (pallet && pallet.status === '出庫済') {
+          await api('updatePallet', {
+            productionYear: pallet.productionYear || String(palletYearFromNo(palletNo) || ''),
+            palletNo,
+            status: '未配置',
+            memo: pallet.memo || '',
+            details: detailsFor(palletNo).map(detail => ({
+              producerNo: detail.producerNo,
+              standard: detail.standard,
+              weight: detail.weight,
+              price: detail.price || 0,
+              memo: detailContainerCountText(detail)
+            }))
+          });
+          resetFromShipped = true;
+        }
         const res = await api('recordInbound', {
-          palletNo: $('inPalletNo').value,
+          palletNo,
           locationId: state.selectedLocations.inbound,
           memo: $('inMemo').value
         });
@@ -3019,7 +3038,9 @@
         state.lockedPallets.inbound = '';
         renderPalletLocks();
       } catch (error) {
-        showToast(error.message, true);
+        showToast(resetFromShipped
+          ? `出庫済パレットは未配置に戻りましたが、入庫に失敗しました。場所を確認して再度入庫してください。${error.message}`
+          : error.message, true);
       }
     }
 
