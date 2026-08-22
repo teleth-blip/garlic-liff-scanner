@@ -892,6 +892,12 @@
     .search-total-item + .search-total-item {
       border-left: 1px solid var(--line);
     }
+    .search-total-item:nth-child(3n + 1) {
+      border-left: 0;
+    }
+    .search-total-item:nth-child(n + 4) {
+      border-top: 1px solid var(--line);
+    }
     .search-total-item span {
       color: var(--muted);
       font-size: 12px;
@@ -3194,16 +3200,30 @@
     }
 
     function searchTotalHtml(rows) {
-      const palletCount = new Set(rows.map(row => row.palletNo).filter(Boolean)).size;
-      const weight = rows.reduce((total, row) => {
+      const palletCount = new Set(rows
+        .filter(row => detailContainerCountText(row) !== 'スチール')
+        .map(row => row.palletNo)
+        .filter(Boolean)).size;
+      const totals = rows.reduce((result, row) => {
         const value = row.detailNo ? row.weight : (row.pallet && row.pallet.weight);
-        return total + Number(value || 0);
-      }, 0);
+        const weight = Number(value || 0);
+        if (detailContainerCountText(row) === 'スチール') {
+          result.steelWeight += weight;
+          result.steelContainerCount += 1;
+        } else {
+          result.normalWeight += weight;
+        }
+        return result;
+      }, { normalWeight: 0, steelWeight: 0, steelContainerCount: 0 });
       const containerCount = rows.reduce((total, row) => total + detailContainerCountNumber(row), 0);
+      const totalWeight = totals.normalWeight + totals.steelWeight;
       return `<div class="search-total">
         <div class="search-total-item"><span>パレット</span><strong>${num(palletCount)}枚</strong></div>
-        <div class="search-total-item"><span>重量</span><strong>${num(weight)}kg</strong></div>
-        <div class="search-total-item"><span>コンテナ数</span><strong>${num(containerCount)}</strong></div>
+        <div class="search-total-item"><span>通常コンテナ数</span><strong>${num(containerCount)}</strong></div>
+        <div class="search-total-item"><span>スチールコンテナ数</span><strong>${num(totals.steelContainerCount)}</strong></div>
+        <div class="search-total-item"><span>通常重量</span><strong>${num(totals.normalWeight)}kg</strong></div>
+        <div class="search-total-item"><span>スチール重量</span><strong>${num(totals.steelWeight)}kg</strong></div>
+        <div class="search-total-item"><span>総重量</span><strong>${num(totalWeight)}kg</strong></div>
       </div>`;
     }
 
