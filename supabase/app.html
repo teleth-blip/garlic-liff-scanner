@@ -3295,7 +3295,8 @@
         return;
       }
       const headerCells = matrix.coolers.map(cooler => `<th>${esc(cooler.coolerName)}</th>`).join('');
-      const bodyRows = matrix.rows.map(row => `<tr>
+      const bodyRows = matrix.rows.map((row, index) => `<tr>
+        <td class="number">${index + 1}</td>
         <th>${esc(row.standardName)}</th>
         ${matrix.coolers.map(cooler => `<td>${num(row.weights[cooler.coolerId] || 0)}</td>`).join('')}
         <td class="total">${num(row.total)}</td>
@@ -3307,27 +3308,31 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>冷蔵庫別 規格重量一覧</title>
         <style>
-          @page { size: A4 portrait; margin: 12mm 18mm; }
+          @page { size: A4 portrait; margin: 12mm 18mm 12mm 22mm; }
           * { box-sizing: border-box; }
           body { margin: 0; color: #000; background: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
           .toolbar { display: flex; gap: 8px; margin: 0 0 12px; }
           button { min-height: 40px; padding: 8px 14px; border: 1px solid #444; background: #fff; color: #000; font-weight: 700; }
           h1 { margin: 0; font-size: 20px; text-align: center; }
           .meta { display: flex; justify-content: space-between; margin: 6px 0 9px; font-size: 10px; }
-          table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10.5px; }
+          table { width: 100%; border: 3px solid #000; border-collapse: collapse; table-layout: fixed; font-size: 10.5px; }
           th, td { border: 1px solid #000; padding: 4.5px 3.5px; }
           thead th, tfoot th, tfoot td, td.total { font-weight: 800; }
+          thead tr { border-bottom: 2px solid #000; }
+          tfoot tr { border-top: 2px solid #000; }
           th { text-align: center; overflow-wrap: anywhere; }
-          tbody th { width: 24%; text-align: left; }
+          tbody th { width: 22%; text-align: left; }
           td { text-align: right; }
+          .number { width: 7%; border-right: 2px solid #000; text-align: center; }
+          thead th:last-child, tbody td:last-child, tfoot td:last-child { border-left: 2px solid #000; }
           @media print { .toolbar { display: none; } }
         </style></head><body>
         <div class="toolbar"><button type="button" onclick="window.print()">印刷・PDF保存</button><button type="button" onclick="window.close()">閉じる</button></div>
         <h1>冷蔵庫別 規格重量一覧</h1>
         <div class="meta"><span>単位：kg</span><span>作成日時：${esc(createdAt)}</span></div>
-        <table><thead><tr><th>規格名</th>${headerCells}<th>合計</th></tr></thead>
+        <table><thead><tr><th class="number">No.</th><th>規格名</th>${headerCells}<th>合計</th></tr></thead>
         <tbody>${bodyRows}</tbody>
-        <tfoot><tr><th>合計</th>${footerCells}<td>${num(matrix.grandTotal)}</td></tr></tfoot></table>
+        <tfoot><tr><td class="number"></td><th>合計</th>${footerCells}<td>${num(matrix.grandTotal)}</td></tr></tfoot></table>
         </body></html>`);
       printWindow.document.close();
       setTimeout(() => {
