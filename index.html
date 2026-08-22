@@ -3010,6 +3010,9 @@
       try {
         const palletNo = cleanText($('inPalletNo').value);
         const pallet = findPallet(palletNo);
+        if (pallet && pallet.status === '保管中') {
+          throw new Error('保管中のパレットは入庫できません。');
+        }
         if (pallet && pallet.status === '出庫済') {
           await api('updatePallet', {
             productionYear: pallet.productionYear || String(palletYearFromNo(palletNo) || ''),
@@ -3026,11 +3029,18 @@
           });
           resetFromShipped = true;
         }
-        const res = await api('recordInbound', {
-          palletNo,
-          locationId: state.selectedLocations.inbound,
-          memo: $('inMemo').value
-        });
+        const res = pallet && pallet.status === '仮移動中'
+          ? await api('completeMove', {
+              palletNo,
+              locationId: state.selectedLocations.inbound,
+              memo: $('inMemo').value
+            })
+          : await api('recordInbound', {
+              palletNo,
+              locationId: state.selectedLocations.inbound,
+              memo: $('inMemo').value
+            });
+        if (pallet && pallet.status === '仮移動中') res.message = '入庫を登録しました。';
         applyDataResponse(res);
         $('inPalletNo').value = '';
         $('inMemo').value = '';
