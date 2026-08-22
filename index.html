@@ -567,27 +567,26 @@
       white-space: nowrap;
     }
     .register-list-table {
-      min-width: 500px;
-      table-layout: fixed;
+      width: max-content;
+      min-width: 100%;
+      table-layout: auto;
     }
     .register-list-table th,
     .register-list-table td {
       padding: 6px 5px;
       font-size: 12px;
+      width: 1%;
+      white-space: nowrap;
     }
-    .register-list-table th:nth-child(1),
-    .register-list-table td:nth-child(1) { width: 96px; }
-    .register-list-table th:nth-child(2),
-    .register-list-table td:nth-child(2) { width: 66px; }
-    .register-list-table th:nth-child(3),
-    .register-list-table td:nth-child(3) { width: 58px; text-align: right; }
     .register-list-table th:nth-child(4),
-    .register-list-table td:nth-child(4) { width: 132px; }
+    .register-list-table td:nth-child(4),
     .register-list-table th:nth-child(5),
-    .register-list-table td:nth-child(5) { width: 72px; text-align: right; }
-    .register-list-table th:nth-child(6),
-    .register-list-table td:nth-child(6) { width: 62px; text-align: center; }
+    .register-list-table td:nth-child(5) { text-align: right; }
+    .register-list-table th:nth-child(7),
+    .register-list-table td:nth-child(7) { text-align: center; }
     .register-location-cell {
+      width: auto !important;
+      max-width: 150px;
       white-space: normal;
       overflow-wrap: anywhere;
       line-height: 1.25;
