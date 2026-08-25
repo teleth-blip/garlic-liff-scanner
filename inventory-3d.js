@@ -43,6 +43,8 @@
     renderer.domElement.tabIndex = 0;
     host.appendChild(renderer.domElement);
 
+    const entranceMarker = document.querySelector('.inventory-3d-entrance');
+    let modelBounds = null;
     let renderQueued = false;
     function resize() {
       const width = Math.max(1, host.clientWidth);
@@ -63,7 +65,42 @@
         renderQueued = false;
         resize();
         renderer.render(scene, camera);
+        positionEntranceMarker();
       });
+    }
+
+    function positionEntranceMarker() {
+      if (!entranceMarker || !modelBounds || modelBounds.isEmpty()) return;
+      const rect = host.getBoundingClientRect();
+      const min = modelBounds.min;
+      const max = modelBounds.max;
+      const corners = [
+        [min.x, min.y, min.z], [min.x, min.y, max.z],
+        [min.x, max.y, min.z], [min.x, max.y, max.z],
+        [max.x, min.y, min.z], [max.x, min.y, max.z],
+        [max.x, max.y, min.z], [max.x, max.y, max.z]
+      ];
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      let visiblePoints = 0;
+      corners.forEach(values => {
+        const projected = new THREE.Vector3(...values).project(camera);
+        if (![projected.x, projected.y, projected.z].every(Number.isFinite) || projected.z < -1 || projected.z > 1) return;
+        const x = rect.left + (projected.x + 1) * rect.width / 2;
+        const y = rect.top + (1 - projected.y) * rect.height / 2;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        visiblePoints += 1;
+      });
+      if (visiblePoints < 2) {
+        entranceMarker.style.visibility = 'hidden';
+        return;
+      }
+      entranceMarker.style.left = `${(minX + maxX) / 2}px`;
+      entranceMarker.style.top = `${maxY + 10}px`;
+      entranceMarker.style.visibility = 'visible';
     }
 
     const center = new THREE.Vector3(0, ((levels - 1) * unitY) / 2, 0);
@@ -155,6 +192,19 @@
           palletObjects.push({ mesh, edges, label: label.sprite, palletNo: placement.palletNo });
         }
       }
+    }
+
+    modelBounds = new THREE.Box3();
+    if (meshes.length) {
+      meshes.forEach(mesh => {
+        modelBounds.expandByPoint(new THREE.Vector3(mesh.position.x - 0.41, mesh.position.y - 0.3, mesh.position.z - 0.41));
+        modelBounds.expandByPoint(new THREE.Vector3(mesh.position.x + 0.41, mesh.position.y + 0.3, mesh.position.z + 0.41));
+      });
+    } else {
+      modelBounds.set(
+        new THREE.Vector3(-cols / 2, -0.36, -rows / 2),
+        new THREE.Vector3(cols / 2, (levels - 1) * unitY + 0.36, rows / 2)
+      );
     }
 
     const raycaster = new THREE.Raycaster();

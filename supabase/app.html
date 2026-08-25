@@ -294,7 +294,7 @@
     .inventory-3d-info {
       position: fixed;
       left: calc(10px + env(safe-area-inset-left));
-      bottom: calc(68px + env(safe-area-inset-bottom));
+      bottom: calc(10px + env(safe-area-inset-bottom));
       z-index: 203;
       max-width: min(320px, calc(100vw - 20px));
       padding: 9px 11px;
@@ -308,8 +308,8 @@
     }
     .inventory-3d-entrance {
       position: fixed;
-      left: 50%;
-      bottom: calc(10px + env(safe-area-inset-bottom));
+      top: 0;
+      left: 0;
       z-index: 204;
       display: flex;
       align-items: center;
@@ -325,6 +325,7 @@
       font-size: 15px;
       font-weight: 900;
       white-space: nowrap;
+      visibility: hidden;
       pointer-events: none;
     }
     .inventory-3d-entrance svg { width: 24px; height: 24px; stroke-width: 2.5; }
