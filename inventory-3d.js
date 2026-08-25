@@ -258,6 +258,16 @@
 
     const canvas = renderer.domElement;
     const signal = abortController.signal;
+    function preventBrowserGesture(event) {
+      if (event.cancelable) event.preventDefault();
+    }
+    ['wheel', 'gesturestart', 'gesturechange', 'gestureend', 'touchmove'].forEach(type => {
+      host.addEventListener(type, preventBrowserGesture, {
+        capture: true,
+        passive: false,
+        signal
+      });
+    });
     canvas.addEventListener('pointerdown', event => {
       pointerStarts.set(event.pointerId, { x: event.clientX, y: event.clientY, moved: false });
       if (pointerStarts.size > 1) {

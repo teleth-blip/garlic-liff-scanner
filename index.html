@@ -231,12 +231,18 @@
       padding-top: 10px;
       background: #fff;
     }
-    body.inventory-3d-open { overflow: hidden; }
+    body.inventory-3d-open {
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
     .inventory-3d-modal {
       position: fixed;
       inset: 0;
       z-index: 200;
       overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      user-select: none;
       background: #f4f7f5;
     }
     .inventory-3d-canvas { position: absolute; inset: 0; }
