@@ -294,7 +294,7 @@
     .inventory-3d-info {
       position: fixed;
       left: calc(10px + env(safe-area-inset-left));
-      bottom: calc(10px + env(safe-area-inset-bottom));
+      bottom: calc(68px + env(safe-area-inset-bottom));
       z-index: 203;
       max-width: min(320px, calc(100vw - 20px));
       padding: 9px 11px;
@@ -306,6 +306,28 @@
       line-height: 1.5;
       white-space: pre-line;
     }
+    .inventory-3d-entrance {
+      position: fixed;
+      left: 50%;
+      bottom: calc(10px + env(safe-area-inset-bottom));
+      z-index: 204;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 46px;
+      padding: 8px 14px;
+      transform: translateX(-50%);
+      border: 2px solid #174f3f;
+      border-radius: 6px;
+      background: #ffe58a;
+      box-shadow: 0 3px 10px rgba(23, 79, 63, .28);
+      color: #102c23;
+      font-size: 15px;
+      font-weight: 900;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .inventory-3d-entrance svg { width: 24px; height: 24px; stroke-width: 2.5; }
     .inventory-3d-loading {
       position: fixed;
       inset: 0;
@@ -1450,6 +1472,7 @@
       </label>
     </div>
     <div id="inventory3dInfo" class="inventory-3d-info hidden"></div>
+    <div class="inventory-3d-entrance" aria-label="冷蔵庫入口"><i data-lucide="door-open"></i><span>↑ 冷蔵庫入口</span></div>
     <div id="inventory3dLoading" class="inventory-3d-loading">3D表示を準備中...</div>
     <button type="button" id="inventory3dCloseBtn" class="inventory-3d-close"><i data-lucide="x"></i><span>キャンセル</span></button>
   </div>

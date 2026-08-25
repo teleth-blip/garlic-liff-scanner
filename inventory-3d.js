@@ -115,20 +115,6 @@
     floor.position.y = -0.39;
     scene.add(floor);
 
-    const entranceLabel = createTextLabel(THREE, '冷蔵庫入口', {
-      color: '#174f3f',
-      fontSize: 58,
-      depthTest: false,
-      width: 1.85,
-      height: 0.34
-    });
-    const entranceZ = rows / 2 + 0.82;
-    const entranceX = clamp(entranceZ * Math.tan(yaw), -cols / 2, cols / 2);
-    entranceLabel.sprite.position.set(entranceX, -0.27, entranceZ);
-    scene.add(entranceLabel.sprite);
-    labelMaterials.push(entranceLabel.material);
-    labelTextures.push(entranceLabel.texture);
-
     for (let level = 1; level <= levels; level += 1) {
       for (let row = 1; row <= rows; row += 1) {
         for (let col = 1; col <= cols; col += 1) {
