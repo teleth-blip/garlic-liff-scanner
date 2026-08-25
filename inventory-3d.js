@@ -33,6 +33,12 @@
     const locations = locationMap(options.locations || [], cooler.coolerId);
     const placementMap = new Map((options.placements || []).map(item => [item.locationId, item]));
     const palletMap = new Map((options.pallets || []).map(item => [item.palletNo, item]));
+    const detailMap = new Map();
+    (options.details || []).forEach(detail => {
+      if (!detailMap.has(detail.palletNo)) detailMap.set(detail.palletNo, []);
+      detailMap.get(detail.palletNo).push(detail);
+    });
+    detailMap.forEach(details => details.sort((a, b) => Number(a.detailNo || 0) - Number(b.detailNo || 0)));
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf4f7f5);
     const camera = new THREE.PerspectiveCamera(42, 1, 0.03, Math.max(rows, cols, levels) * 40 + 40);
@@ -156,7 +162,7 @@
           palletMaterials.push(material);
           const mesh = new THREE.Mesh(palletGeometry, material);
           mesh.position.copy(position);
-          mesh.userData = { palletNo: placement.palletNo, location, pallet };
+          mesh.userData = { palletNo: placement.palletNo, location, pallet, details: detailMap.get(placement.palletNo) || [] };
           scene.add(mesh);
           meshes.push(mesh);
 
@@ -213,7 +219,19 @@
       }
       const location = data.location || {};
       const pallet = data.pallet || {};
-      info.textContent = `${data.palletNo}  ${Number(pallet.weight || 0).toLocaleString('ja-JP')}kg\n${location.level || ''}段目 / ${location.row || ''}行 / ${location.col || ''}列`;
+      const lines = [
+        `${data.palletNo}  ${Number(pallet.weight || 0).toLocaleString('ja-JP')}kg`,
+        `${location.level || ''}段目 / ${location.row || ''}行 / ${location.col || ''}列`
+      ];
+      if (data.details && data.details.length) {
+        data.details.forEach((detail, index) => {
+          lines.push(`明細${index + 1}  生産者名: ${detail.producerName || '名称なし'}`);
+          lines.push(`規格: ${detail.standard || '-'} / コンテナ数: ${detail.containerCount || '-'}`);
+        });
+      } else {
+        lines.push('明細なし');
+      }
+      info.textContent = lines.join('\n');
       info.classList.remove('hidden');
     }
 

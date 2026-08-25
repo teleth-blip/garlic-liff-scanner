@@ -297,6 +297,8 @@
       bottom: calc(10px + env(safe-area-inset-bottom));
       z-index: 203;
       max-width: min(320px, calc(100vw - 20px));
+      max-height: min(45vh, 360px);
+      overflow: auto;
       padding: 9px 11px;
       border-left: 4px solid #d99a17;
       background: rgba(255, 255, 255, .92);
@@ -3165,6 +3167,13 @@
           locations: state.data.master.locations,
           placements: state.data.placements,
           pallets: state.data.pallets,
+          details: (state.data.details || []).map(detail => ({
+            palletNo: detail.palletNo,
+            detailNo: detail.detailNo,
+            producerName: resolveProducerName(detail),
+            standard: detail.standard,
+            containerCount: detailContainerCountText(detail)
+          })),
           selectedPalletNo: state.inventorySelectedPalletNo,
           transparency: $('inventory3dTransparency').value,
           onSelect: selectInventory3dPallet
