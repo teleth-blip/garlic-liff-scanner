@@ -68,7 +68,9 @@
 
     const center = new THREE.Vector3(0, ((levels - 1) * unitY) / 2, 0);
     const sceneSize = Math.max(cols, rows, levels * 1.35, 3);
-    const distance = sceneSize * 1.75 + 2.6;
+    const viewportAspect = Math.max(0.35, host.clientWidth / Math.max(1, host.clientHeight));
+    const portraitFit = Math.max(1, 0.72 / viewportAspect);
+    const distance = (sceneSize * 1.75 + 2.6) * portraitFit;
     const yaw = 0.72;
     const pitch = 0.52;
     const horizontal = Math.cos(pitch) * distance;
@@ -112,6 +114,20 @@
     floor.position.y = -0.39;
     scene.add(floor);
 
+    const entranceLabel = createTextLabel(THREE, '冷蔵庫入口', {
+      color: '#174f3f',
+      fontSize: 58,
+      depthTest: false,
+      width: 1.85,
+      height: 0.34
+    });
+    const entranceZ = rows / 2 + 0.82;
+    const entranceX = clamp(entranceZ * Math.tan(yaw), -cols / 2, cols / 2);
+    entranceLabel.sprite.position.set(entranceX, -0.27, entranceZ);
+    scene.add(entranceLabel.sprite);
+    labelMaterials.push(entranceLabel.material);
+    labelTextures.push(entranceLabel.texture);
+
     for (let level = 1; level <= levels; level += 1) {
       for (let row = 1; row <= rows; row += 1) {
         for (let col = 1; col <= cols; col += 1) {
@@ -146,7 +162,6 @@
 
           const label = createPalletLabel(THREE, placement.palletNo);
           label.sprite.position.set(position.x, position.y + 0.01, position.z);
-          label.sprite.renderOrder = 20;
           scene.add(label.sprite);
           labelMaterials.push(label.material);
           labelTextures.push(label.texture);
@@ -176,7 +191,7 @@
         const selected = item.palletNo === selectedPalletNo;
         item.mesh.material.color.setHex(selected ? 0xf2b84b : 0x2f9473);
         item.edges.material = selected ? selectedLineMaterial : palletLineMaterial;
-        item.label.scale.set(selected ? 1.02 : 0.9, selected ? 0.255 : 0.225, 1);
+        item.label.scale.set(selected ? 0.76 : 0.68, selected ? 0.19 : 0.17, 1);
       });
       const selectedObject = palletObjects.find(item => item.palletNo === selectedPalletNo);
       renderInfo(selectedObject ? selectedObject.mesh.userData : null);
@@ -252,26 +267,39 @@
   }
 
   function createPalletLabel(THREE, palletNo) {
+    return createTextLabel(THREE, palletNo, {
+      color: '#ffffff',
+      fontSize: 60,
+      depthTest: true,
+      width: 0.68,
+      height: 0.17,
+      shadow: true
+    });
+  }
+
+  function createTextLabel(THREE, text, options) {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 128;
     const context = canvas.getContext('2d');
-    context.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    context.fillRect(4, 4, 504, 120);
-    context.strokeStyle = '#174f3f';
-    context.lineWidth = 8;
-    context.strokeRect(4, 4, 504, 120);
-    context.fillStyle = '#102c23';
-    context.font = '700 58px sans-serif';
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = options.color;
+    context.font = `700 ${options.fontSize}px sans-serif`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText(String(palletNo || ''), 256, 66, 470);
+    if (options.shadow) {
+      context.shadowColor = 'rgba(0, 0, 0, 0.75)';
+      context.shadowBlur = 5;
+      context.shadowOffsetX = 1;
+      context.shadowOffsetY = 1;
+    }
+    context.fillText(String(text || ''), 256, 66, 480);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.minFilter = THREE.LinearFilter;
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: options.depthTest, depthWrite: false });
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(0.9, 0.225, 1);
+    sprite.scale.set(options.width, options.height, 1);
     return { sprite, material, texture };
   }
 
