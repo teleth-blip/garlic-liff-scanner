@@ -35,7 +35,7 @@
     const palletMap = new Map((options.pallets || []).map(item => [item.palletNo, item]));
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf4f7f5);
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, Math.max(rows, cols, levels) * 40 + 40);
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.03, Math.max(rows, cols, levels) * 40 + 40);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -86,8 +86,9 @@
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.enableZoom = true;
+    controls.zoomToCursor = true;
     controls.screenSpacePanning = true;
-    controls.minDistance = Math.max(2.5, sceneSize * 0.55);
+    controls.minDistance = 0.08;
     controls.maxDistance = sceneSize * 5 + 10;
     controls.maxPolarAngle = Math.PI * 0.96;
     controls.update();
