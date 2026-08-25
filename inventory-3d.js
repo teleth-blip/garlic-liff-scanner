@@ -109,7 +109,8 @@
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.enableZoom = true;
-    controls.zoomToCursor = true;
+    controls.zoomSpeed = 0.65;
+    controls.zoomToCursor = false;
     controls.screenSpacePanning = true;
     controls.minDistance = 0.08;
     controls.maxDistance = sceneSize * 5 + 10;
@@ -185,6 +186,23 @@
     const abortController = new AbortController();
     const pointerStarts = new Map();
     let multiPointerGesture = false;
+    let pinchTravelDistance = null;
+    let adjustingPinchTravel = false;
+
+    function applyPinchTravel() {
+      if (pinchTravelDistance === null || adjustingPinchTravel || pointerStarts.size < 2) return;
+      const currentDistance = camera.position.distanceTo(controls.target);
+      const travelDistance = pinchTravelDistance - currentDistance;
+      if (Math.abs(travelDistance) < 0.0001) return;
+      const forward = controls.target.clone().sub(camera.position);
+      if (forward.lengthSq() < 0.000001) return;
+      adjustingPinchTravel = true;
+      controls.target.addScaledVector(forward.normalize(), travelDistance);
+      controls.update();
+      adjustingPinchTravel = false;
+      pinchTravelDistance = camera.position.distanceTo(controls.target);
+    }
+    controls.addEventListener('change', applyPinchTravel);
 
     function selectAt(clientX, clientY) {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -239,7 +257,10 @@
     const signal = abortController.signal;
     canvas.addEventListener('pointerdown', event => {
       pointerStarts.set(event.pointerId, { x: event.clientX, y: event.clientY, moved: false });
-      if (pointerStarts.size > 1) multiPointerGesture = true;
+      if (pointerStarts.size > 1) {
+        multiPointerGesture = true;
+        pinchTravelDistance = camera.position.distanceTo(controls.target);
+      }
     }, { signal });
     canvas.addEventListener('pointermove', event => {
       const start = pointerStarts.get(event.pointerId);
@@ -249,11 +270,13 @@
       const start = pointerStarts.get(event.pointerId);
       const shouldSelect = start && !start.moved && !multiPointerGesture && pointerStarts.size === 1;
       pointerStarts.delete(event.pointerId);
+      if (pointerStarts.size < 2) pinchTravelDistance = null;
       if (!pointerStarts.size) multiPointerGesture = false;
       if (shouldSelect) selectAt(event.clientX, event.clientY);
     }, { signal });
     canvas.addEventListener('pointercancel', event => {
       pointerStarts.delete(event.pointerId);
+      if (pointerStarts.size < 2) pinchTravelDistance = null;
       if (!pointerStarts.size) multiPointerGesture = false;
     }, { signal });
 
