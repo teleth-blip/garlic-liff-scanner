@@ -104,12 +104,15 @@
     );
 
     const controls = new OrbitControls(camera, renderer.domElement);
+    const touchDevice = (navigator.maxTouchPoints || 0) > 0 || window.matchMedia('(pointer: coarse)').matches;
     controls.target.copy(center);
     controls.enableDamping = false;
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.enableZoom = true;
-    controls.zoomSpeed = 0.65;
+    controls.rotateSpeed = touchDevice ? 0.72 : 1;
+    controls.panSpeed = touchDevice ? 0.72 : 1;
+    controls.zoomSpeed = touchDevice ? 0.48 : 0.65;
     controls.zoomToCursor = false;
     controls.screenSpacePanning = true;
     controls.minDistance = 0.08;
