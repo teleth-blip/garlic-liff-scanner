@@ -1,21 +1,26 @@
 (function () {
   'use strict';
 
-  const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js';
-  let threePromise = null;
+  let modulePromise = null;
   let view = null;
   let lifecycleToken = 0;
 
-  function loadThree() {
-    if (!threePromise) threePromise = import(THREE_URL);
-    return threePromise;
+  function loadModules() {
+    if (!modulePromise) {
+      modulePromise = Promise.all([
+        import('three'),
+        import('three/addons/controls/OrbitControls.js')
+      ]).then(([THREE, controlsModule]) => ({ THREE, OrbitControls: controlsModule.OrbitControls }));
+    }
+    return modulePromise;
   }
 
   async function open(options) {
     const token = ++lifecycleToken;
     disposeView();
-    const THREE = await loadThree();
+    const { THREE, OrbitControls } = await loadModules();
     if (token !== lifecycleToken) throw new Error('3D表示はキャンセルされました。');
+
     const host = document.getElementById('inventory3dCanvas');
     if (!host) throw new Error('3D表示領域が見つかりません。');
     host.replaceChildren();
@@ -38,20 +43,54 @@
     renderer.domElement.tabIndex = 0;
     host.appendChild(renderer.domElement);
 
+    let renderQueued = false;
+    function resize() {
+      const width = Math.max(1, host.clientWidth);
+      const height = Math.max(1, host.clientHeight);
+      const canvas = renderer.domElement;
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.75);
+      if (canvas.width !== Math.floor(width * ratio) || canvas.height !== Math.floor(height * ratio)) {
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      }
+    }
+
+    function requestRender() {
+      if (renderQueued) return;
+      renderQueued = true;
+      requestAnimationFrame(() => {
+        renderQueued = false;
+        resize();
+        renderer.render(scene, camera);
+      });
+    }
+
     const center = new THREE.Vector3(0, ((levels - 1) * unitY) / 2, 0);
     const sceneSize = Math.max(cols, rows, levels * 1.35, 3);
-    const controls = {
-      target: center.clone(),
-      initialTarget: center.clone(),
-      yaw: 0.72,
-      pitch: 0.52,
-      distance: sceneSize * 1.75 + 2.6,
-      initialYaw: 0.72,
-      initialPitch: 0.52,
-      initialDistance: sceneSize * 1.75 + 2.6,
-      minDistance: Math.max(2.5, sceneSize * 0.55),
-      maxDistance: sceneSize * 5 + 10
-    };
+    const distance = sceneSize * 1.75 + 2.6;
+    const yaw = 0.72;
+    const pitch = 0.52;
+    const horizontal = Math.cos(pitch) * distance;
+    camera.position.set(
+      center.x + Math.sin(yaw) * horizontal,
+      center.y + Math.sin(pitch) * distance,
+      center.z + Math.cos(yaw) * horizontal
+    );
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(center);
+    controls.enableDamping = false;
+    controls.enablePan = true;
+    controls.enableRotate = true;
+    controls.enableZoom = true;
+    controls.screenSpacePanning = true;
+    controls.minDistance = Math.max(2.5, sceneSize * 0.55);
+    controls.maxDistance = sceneSize * 5 + 10;
+    controls.maxPolarAngle = Math.PI * 0.96;
+    controls.update();
+    controls.saveState();
+    controls.addEventListener('change', requestRender);
 
     const slotGeometry = new THREE.BoxGeometry(0.96, 0.72, 0.96);
     const slotEdges = new THREE.EdgesGeometry(slotGeometry);
@@ -62,7 +101,9 @@
     const palletLineMaterial = new THREE.LineBasicMaterial({ color: 0x174f3f, transparent: true, opacity: 0.95 });
     const selectedLineMaterial = new THREE.LineBasicMaterial({ color: 0x8a5a00, transparent: true, opacity: 1 });
     const meshes = [];
-    const materials = [];
+    const palletMaterials = [];
+    const labelMaterials = [];
+    const labelTextures = [];
     const palletObjects = [];
     let selectedPalletNo = options.selectedPalletNo || '';
     let transparency = clamp(Number(options.transparency ?? 45), 10, 85);
@@ -75,14 +116,7 @@
       for (let row = 1; row <= rows; row += 1) {
         for (let col = 1; col <= cols; col += 1) {
           const locationId = makeLocationId(cooler.coolerId, level, row, col);
-          const location = locations.get(locationId) || {
-            locationId,
-            coolerId: cooler.coolerId,
-            level,
-            row,
-            col,
-            available: false
-          };
+          const location = locations.get(locationId) || { locationId, coolerId: cooler.coolerId, level, row, col, available: false };
           const position = cellPosition(col, row, level, cols, rows, unitY);
           const slot = new THREE.LineSegments(slotEdges, location.available === false ? blockedLineMaterial : usableLineMaterial);
           slot.position.copy(position);
@@ -99,7 +133,7 @@
             depthWrite: false,
             side: THREE.DoubleSide
           });
-          materials.push(material);
+          palletMaterials.push(material);
           const mesh = new THREE.Mesh(palletGeometry, material);
           mesh.position.copy(position);
           mesh.userData = { palletNo: placement.palletNo, location, pallet };
@@ -108,9 +142,15 @@
 
           const edges = new THREE.LineSegments(palletEdges, selected ? selectedLineMaterial : palletLineMaterial);
           edges.position.copy(position);
-          edges.userData.palletNo = placement.palletNo;
           scene.add(edges);
-          palletObjects.push({ mesh, edges, palletNo: placement.palletNo });
+
+          const label = createPalletLabel(THREE, placement.palletNo);
+          label.sprite.position.set(position.x, position.y + 0.01, position.z);
+          label.sprite.renderOrder = 20;
+          scene.add(label.sprite);
+          labelMaterials.push(label.material);
+          labelTextures.push(label.texture);
+          palletObjects.push({ mesh, edges, label: label.sprite, palletNo: placement.palletNo });
         }
       }
     }
@@ -118,67 +158,8 @@
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const abortController = new AbortController();
-    const pointerState = new Map();
-    let touchGesture = null;
-    let mouseDrag = null;
-    let hoverPoint = null;
-    let renderQueued = false;
-
-    function requestRender() {
-      if (renderQueued) return;
-      renderQueued = true;
-      requestAnimationFrame(() => {
-        renderQueued = false;
-        resize();
-        renderer.render(scene, camera);
-      });
-    }
-
-    function resize() {
-      const width = Math.max(1, host.clientWidth);
-      const height = Math.max(1, host.clientHeight);
-      const canvas = renderer.domElement;
-      const targetWidth = Math.floor(width * Math.min(window.devicePixelRatio || 1, 1.75));
-      const targetHeight = Math.floor(height * Math.min(window.devicePixelRatio || 1, 1.75));
-      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-        renderer.setSize(width, height, false);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-      }
-    }
-
-    function updateCamera() {
-      controls.pitch = clamp(controls.pitch, -0.05, 1.38);
-      controls.distance = clamp(controls.distance, controls.minDistance, controls.maxDistance);
-      const horizontal = Math.cos(controls.pitch) * controls.distance;
-      camera.position.set(
-        controls.target.x + Math.sin(controls.yaw) * horizontal,
-        controls.target.y + Math.sin(controls.pitch) * controls.distance,
-        controls.target.z + Math.cos(controls.yaw) * horizontal
-      );
-      camera.lookAt(controls.target);
-      requestRender();
-    }
-
-    function rotateBy(dx, dy) {
-      controls.yaw -= dx * 0.008;
-      controls.pitch += dy * 0.006;
-      updateCamera();
-    }
-
-    function panBy(dx, dy) {
-      const scale = controls.distance * 0.0017;
-      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-      controls.target.addScaledVector(right, -dx * scale);
-      controls.target.addScaledVector(up, dy * scale);
-      updateCamera();
-    }
-
-    function zoomBy(factor) {
-      controls.distance *= factor;
-      updateCamera();
-    }
+    const pointerStarts = new Map();
+    let multiPointerGesture = false;
 
     function selectAt(clientX, clientY) {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -186,8 +167,7 @@
       pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObjects(meshes, false)[0];
-      if (!hit) return;
-      selectPallet(hit.object.userData.palletNo, true);
+      if (hit) selectPallet(hit.object.userData.palletNo, true);
     }
 
     function selectPallet(palletNo, notify) {
@@ -196,6 +176,7 @@
         const selected = item.palletNo === selectedPalletNo;
         item.mesh.material.color.setHex(selected ? 0xf2b84b : 0x2f9473);
         item.edges.material = selected ? selectedLineMaterial : palletLineMaterial;
+        item.label.scale.set(selected ? 1.02 : 0.9, selected ? 0.255 : 0.225, 1);
       });
       const selectedObject = palletObjects.find(item => item.palletNo === selectedPalletNo);
       renderInfo(selectedObject ? selectedObject.mesh.userData : null);
@@ -217,131 +198,81 @@
       info.classList.remove('hidden');
     }
 
-    function pairMetrics() {
-      const points = Array.from(pointerState.values()).slice(0, 2);
-      if (points.length < 2) return null;
-      return {
-        cx: (points[0].x + points[1].x) / 2,
-        cy: (points[0].y + points[1].y) / 2,
-        distance: Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y)
-      };
-    }
-
     const canvas = renderer.domElement;
     const signal = abortController.signal;
-    function capturePointer(pointerId) {
-      try {
-        canvas.setPointerCapture(pointerId);
-      } catch (_) {
-        // Some embedded browsers defer pointer capture; gesture tracking still works.
-      }
-    }
     canvas.addEventListener('pointerdown', event => {
-      if (event.pointerType === 'mouse') {
-        if (event.button !== 0) return;
-        mouseDrag = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false };
-        capturePointer(event.pointerId);
-        return;
-      }
-      capturePointer(event.pointerId);
-      pointerState.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false });
-      if (pointerState.size === 2) {
-        pointerState.forEach(point => { point.moved = true; });
-        touchGesture = pairMetrics();
-      }
+      pointerStarts.set(event.pointerId, { x: event.clientX, y: event.clientY, moved: false });
+      if (pointerStarts.size > 1) multiPointerGesture = true;
     }, { signal });
-
     canvas.addEventListener('pointermove', event => {
-      if (event.pointerType === 'mouse') {
-        if (mouseDrag && (event.buttons & 1)) {
-          const dx = event.clientX - mouseDrag.x;
-          const dy = event.clientY - mouseDrag.y;
-          mouseDrag.x = event.clientX;
-          mouseDrag.y = event.clientY;
-          if (Math.hypot(event.clientX - mouseDrag.startX, event.clientY - mouseDrag.startY) > 4) mouseDrag.moved = true;
-          panBy(dx, dy);
-        } else if (!mouseDrag) {
-          if (hoverPoint) rotateBy(event.clientX - hoverPoint.x, event.clientY - hoverPoint.y);
-          hoverPoint = { x: event.clientX, y: event.clientY };
-        }
-        return;
-      }
-      const point = pointerState.get(event.pointerId);
-      if (!point) return;
-      const dx = event.clientX - point.x;
-      const dy = event.clientY - point.y;
-      point.x = event.clientX;
-      point.y = event.clientY;
-      if (Math.hypot(event.clientX - point.startX, event.clientY - point.startY) > 5) point.moved = true;
-      if (pointerState.size === 1) {
-        rotateBy(dx, dy);
-        return;
-      }
-      const nextGesture = pairMetrics();
-      if (nextGesture && touchGesture) {
-        panBy(nextGesture.cx - touchGesture.cx, nextGesture.cy - touchGesture.cy);
-        if (touchGesture.distance > 1 && nextGesture.distance > 1) zoomBy(touchGesture.distance / nextGesture.distance);
-      }
-      touchGesture = nextGesture;
+      const start = pointerStarts.get(event.pointerId);
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) start.moved = true;
     }, { signal });
-
-    function endPointer(event) {
-      if (event.pointerType === 'mouse') {
-        if (mouseDrag && !mouseDrag.moved) selectAt(event.clientX, event.clientY);
-        mouseDrag = null;
-        hoverPoint = { x: event.clientX, y: event.clientY };
-        return;
-      }
-      const point = pointerState.get(event.pointerId);
-      if (point && pointerState.size === 1 && !point.moved) selectAt(event.clientX, event.clientY);
-      pointerState.delete(event.pointerId);
-      touchGesture = pointerState.size === 2 ? pairMetrics() : null;
-    }
-    canvas.addEventListener('pointerup', endPointer, { signal });
-    canvas.addEventListener('pointercancel', endPointer, { signal });
-    canvas.addEventListener('pointerleave', event => {
-      if (event.pointerType === 'mouse' && !mouseDrag) hoverPoint = null;
+    canvas.addEventListener('pointerup', event => {
+      const start = pointerStarts.get(event.pointerId);
+      const shouldSelect = start && !start.moved && !multiPointerGesture && pointerStarts.size === 1;
+      pointerStarts.delete(event.pointerId);
+      if (!pointerStarts.size) multiPointerGesture = false;
+      if (shouldSelect) selectAt(event.clientX, event.clientY);
     }, { signal });
-    canvas.addEventListener('wheel', event => {
-      event.preventDefault();
-      zoomBy(Math.exp(event.deltaY * 0.0012));
-    }, { passive: false, signal });
-    canvas.addEventListener('contextmenu', event => event.preventDefault(), { signal });
+    canvas.addEventListener('pointercancel', event => {
+      pointerStarts.delete(event.pointerId);
+      if (!pointerStarts.size) multiPointerGesture = false;
+    }, { signal });
 
     const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(requestRender) : null;
     if (resizeObserver) resizeObserver.observe(host);
     else window.addEventListener('resize', requestRender, { signal });
 
     view = {
-      THREE,
       scene,
-      camera,
       renderer,
       host,
       controls,
-      materials,
-      geometries: [slotGeometry, slotEdges, palletGeometry, palletEdges],
+      palletMaterials,
+      labelMaterials,
+      labelTextures,
+      geometries: [slotGeometry, slotEdges, palletGeometry, palletEdges, floor.geometry],
       lineMaterials: [usableLineMaterial, blockedLineMaterial, palletLineMaterial, selectedLineMaterial, floor.material],
-      helperGeometries: [floor.geometry],
       abortController,
       resizeObserver,
-      selectPallet,
       setTransparency(value) {
         transparency = clamp(Number(value), 10, 85);
-        materials.forEach(material => { material.opacity = 1 - transparency / 100; });
+        palletMaterials.forEach(material => { material.opacity = 1 - transparency / 100; });
         requestRender();
       },
       reset() {
-        controls.target.copy(controls.initialTarget);
-        controls.yaw = controls.initialYaw;
-        controls.pitch = controls.initialPitch;
-        controls.distance = controls.initialDistance;
-        updateCamera();
+        controls.reset();
+        requestRender();
       }
     };
-    updateCamera();
     selectPallet(selectedPalletNo, false);
+    requestRender();
     return { palletCount: palletObjects.length };
+  }
+
+  function createPalletLabel(THREE, palletNo) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    context.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    context.fillRect(4, 4, 504, 120);
+    context.strokeStyle = '#174f3f';
+    context.lineWidth = 8;
+    context.strokeRect(4, 4, 504, 120);
+    context.fillStyle = '#102c23';
+    context.font = '700 58px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(String(palletNo || ''), 256, 66, 470);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(0.9, 0.225, 1);
+    return { sprite, material, texture };
   }
 
   function close() {
@@ -353,10 +284,12 @@
     if (!view) return;
     view.abortController.abort();
     if (view.resizeObserver) view.resizeObserver.disconnect();
+    view.controls.dispose();
     view.scene.clear();
     view.geometries.forEach(item => item.dispose());
-    view.helperGeometries.forEach(item => item.dispose());
-    view.materials.forEach(item => item.dispose());
+    view.palletMaterials.forEach(item => item.dispose());
+    view.labelMaterials.forEach(item => item.dispose());
+    view.labelTextures.forEach(item => item.dispose());
     view.lineMaterials.forEach(item => item.dispose());
     view.renderer.dispose();
     view.renderer.forceContextLoss();
@@ -381,11 +314,7 @@
   }
 
   function cellPosition(col, row, level, cols, rows, unitY) {
-    return {
-      x: col - (cols + 1) / 2,
-      y: (level - 1) * unitY,
-      z: row - (rows + 1) / 2
-    };
+    return { x: col - (cols + 1) / 2, y: (level - 1) * unitY, z: row - (rows + 1) / 2 };
   }
 
   function clamp(value, min, max) {

@@ -7,6 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"}}</script>
   <script src="../inventory-3d.js"></script>
   <style>
     :root {
@@ -1652,13 +1653,6 @@
         <button type="button" id="openInventory3dBtn" class="secondary"><i data-lucide="box"></i><span>3D</span></button>
       </div>
       <div id="checkGrid" class="location-grid"></div>
-      <h3>パレット一覧</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>パレット番号</th><th>状態</th><th>重量</th><th>保管</th><th>登録日</th></tr></thead>
-          <tbody id="inventoryRows"></tbody>
-        </table>
-      </div>
     </section>
     <section id="searchPanel" class="panel hidden" data-panel="search">
       <div class="search-controls">
@@ -2199,7 +2193,6 @@
       renderMoveGrid();
       renderMovingList();
       renderCheckGrid();
-      renderInventoryRows();
       renderInventoryPallet();
       renderSearch();
       renderMaster();
@@ -3172,7 +3165,6 @@
       $('inventory3dLoading').classList.add('hidden');
       document.body.classList.remove('inventory-3d-open');
       renderCheckGrid();
-      renderInventoryRows();
     }
 
     function selectInventory3dPallet(palletNo) {
@@ -3184,7 +3176,6 @@
         const location = findLocation(pallet.currentLocationId) || parseLocationId(pallet.currentLocationId);
         if (location) $('checkLevel').value = String(location.level);
       }
-      renderInventoryRows();
       renderInventoryPallet();
     }
 
@@ -3334,18 +3325,6 @@
       }
     }
 
-    function renderInventoryRows() {
-      const q = $('searchPallet').value.trim();
-      const rows = inventoryFilteredPallets(q);
-      if (state.inventorySelectedPalletNo && !rows.some(p => p.palletNo === state.inventorySelectedPalletNo)) state.inventorySelectedPalletNo = '';
-      $('inventoryRows').innerHTML = rows.map(p => `
-        <tr class="selectable-row ${p.palletNo === state.inventorySelectedPalletNo ? 'selected' : ''}" data-inventory-pallet="${esc(p.palletNo)}"><td>${esc(p.palletNo)}</td><td>${esc(p.status)}</td><td>${num(p.weight)}</td><td>${esc(currentStorageLabel(p))}</td><td>${esc(p.registeredAt || '')}</td></tr>
-      `).join('');
-      document.querySelectorAll('[data-inventory-pallet]').forEach(row => row.addEventListener('click', () => {
-        focusInventoryPallet(row.dataset.inventoryPallet, true);
-      }));
-    }
-
     function inventoryFilteredPallets(query) {
       const q = cleanText(query);
       return sortedPallets().filter(p => !q || p.palletNo.includes(q));
@@ -3362,7 +3341,6 @@
       }
       if (!q) state.inventorySelectedPalletNo = '';
       renderCheckGrid();
-      renderInventoryRows();
       renderInventoryPallet();
     }
 
@@ -3373,7 +3351,6 @@
       if (updateSearch) $('searchPallet').value = pallet.palletNo;
       if (pallet.currentLocationId) focusStoredPalletLocation(pallet.palletNo, 'checkCooler', 'checkLevel', '');
       renderCheckGrid();
-      renderInventoryRows();
       renderInventoryPallet();
       openInventoryPalletModal();
     }
