@@ -47,3 +47,5 @@ PY
           git add index.html supabase/app.html .github/workflows/switch-supabase-once.yml
           git commit -m "Switch Supabase project in main app"
           git push
+
+# trigger: 2026-08-29T02:51Z
