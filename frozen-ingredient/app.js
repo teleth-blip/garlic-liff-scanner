@@ -531,12 +531,14 @@
   }
 
   function readConfig() {
-    const stored = getJson(CONFIG_KEY);
-    if (configured(stored)) return stored;
-    return {
+    const fileConfig = {
       supabaseUrl: window.APP_CONFIG && window.APP_CONFIG.supabaseUrl ? window.APP_CONFIG.supabaseUrl : '',
       supabaseAnonKey: window.APP_CONFIG && window.APP_CONFIG.supabaseAnonKey ? window.APP_CONFIG.supabaseAnonKey : ''
     };
+    if (configured(fileConfig)) return fileConfig;
+    const stored = getJson(CONFIG_KEY);
+    if (configured(stored)) return stored;
+    return fileConfig;
   }
 
   function fillSetup(config) {
