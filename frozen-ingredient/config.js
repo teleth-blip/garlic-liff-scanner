@@ -1,4 +1,4 @@
 window.APP_CONFIG = {
-  supabaseUrl: 'https://yedrlbrzrkbtgswzplia.supabase.co',
-  supabaseAnonKey: 'sb_publishable_TiUI0G7_5emKLNINYjRJmA_NluL-UYb'
+  supabaseUrl: 'https://gkazhcddknmgzglcdwtk.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrYXpoY2Rka25tZ3pnbGNkd3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5NjE5NzcsImV4cCI6MjEwMzUzNzk3N30.3KjmIAKyUvZzIWW09SphpGycBP2PqkhVNvIKwlF2CI0'
 };
