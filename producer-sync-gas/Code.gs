@@ -1,5 +1,5 @@
 const CONFIG = {
-  supabaseUrl: 'https://yedrlbrzrkbtgswzplia.supabase.co',
+  supabaseUrl: 'https://gkazhcddknmgzglcdwtk.supabase.co',
   settingKey: 'producer_import_source',
   defaultExcelSource: 'https://drive.google.com/file/d/1ldXwvEHjKce0py91zJA4_T_AOSvrsWKg/view?usp=drive_link',
   defaultSheetName: '仕入先一覧表',
