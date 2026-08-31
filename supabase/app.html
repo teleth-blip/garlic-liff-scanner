@@ -754,6 +754,7 @@
       display: grid;
       gap: 5px;
     }
+    .inbound-pallet-filter { position: relative; }
     .pallet-lock-field input:read-only {
       border-color: #af7f00;
       background: #fff8dc;
@@ -970,7 +971,10 @@
     }
     .search-producer-suggestions,
     .search-pallet-suggestions,
-    .search-standard-suggestions {
+    .search-standard-suggestions,
+    .search-cooler-suggestions,
+    .search-status-suggestions,
+    .inbound-pallet-suggestions {
       position: absolute;
       top: calc(100% + 4px);
       right: 0;
@@ -993,10 +997,15 @@
     }
     .search-producer-suggestions.hidden,
     .search-pallet-suggestions.hidden,
-    .search-standard-suggestions.hidden { display: none; }
+    .search-standard-suggestions.hidden,
+    .search-cooler-suggestions.hidden,
+    .search-status-suggestions.hidden,
+    .inbound-pallet-suggestions.hidden { display: none; }
     .search-producer-option,
     .search-pallet-option,
-    .search-standard-option {
+    .search-standard-option,
+    .search-cooler-option,
+    .search-status-option {
       display: grid;
       grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
       gap: 8px;
@@ -1039,8 +1048,24 @@
       display: block;
       font-weight: 800;
     }
-    .search-cooler-filter { grid-area: cooler; }
-    .search-status-filter { grid-area: status; }
+    .search-cooler-filter {
+      position: relative;
+      grid-area: cooler;
+    }
+    .search-status-filter {
+      position: relative;
+      grid-area: status;
+    }
+    .search-cooler-option,
+    .search-status-option {
+      display: block;
+      font-weight: 800;
+    }
+    .inbound-pallet-suggestions {
+      right: 0;
+      left: auto;
+      min-width: min(260px, calc(100vw - 24px));
+    }
     .search-start-date-filter { grid-area: start-date; }
     .search-end-date-filter { grid-area: end-date; }
     .search-controls label,
@@ -1649,10 +1674,11 @@
         <label>段
           <select id="inLevel"></select>
         </label>
-        <div class="pallet-lock-field">
+        <div class="pallet-lock-field inbound-pallet-filter">
           <label>パレット番号
-            <input id="inPalletNo" autocomplete="off">
+            <input id="inPalletNo" autocomplete="off" aria-controls="inPalletSuggestions" aria-expanded="false">
           </label>
+          <div id="inPalletSuggestions" class="inbound-pallet-suggestions hidden"></div>
         </div>
       </div>
       <div class="memo-row">
@@ -1783,18 +1809,16 @@
           <input id="searchStandard" autocomplete="off" aria-label="規格" aria-controls="searchStandardSuggestions" aria-expanded="false">
           <div id="searchStandardSuggestions" class="search-standard-suggestions hidden"></div>
         </div>
-        <label class="search-cooler-filter">冷蔵庫
-          <select id="searchCooler"></select>
-        </label>
-        <label class="search-status-filter">状態
-          <select id="searchStatus">
-            <option value="">すべて</option>
-            <option value="未配置">未配置</option>
-            <option value="保管中">保管中</option>
-            <option value="仮移動中">仮移動中</option>
-            <option value="出庫済">出庫済</option>
-          </select>
-        </label>
+        <div class="search-filter search-cooler-filter">
+          <span class="search-filter-label">冷蔵庫</span>
+          <input id="searchCooler" autocomplete="off" placeholder="すべて" aria-label="冷蔵庫" aria-controls="searchCoolerSuggestions" aria-expanded="false">
+          <div id="searchCoolerSuggestions" class="search-cooler-suggestions hidden"></div>
+        </div>
+        <div class="search-filter search-status-filter">
+          <span class="search-filter-label">状態</span>
+          <input id="searchStatus" autocomplete="off" placeholder="すべて" aria-label="状態" aria-controls="searchStatusSuggestions" aria-expanded="false">
+          <div id="searchStatusSuggestions" class="search-status-suggestions hidden"></div>
+        </div>
         <label class="search-start-date-filter">開始日
           <input id="searchStartDate" type="date">
         </label>
@@ -2075,7 +2099,11 @@
       $('printBtn').addEventListener('click', () => window.print());
       $('inCooler').addEventListener('change', () => { renderLevelOptions('inLevel', selectedCooler('inCooler')); state.selectedLocations.inbound = ''; renderInboundGrid(); });
       $('inLevel').addEventListener('change', () => { state.selectedLocations.inbound = ''; renderInboundGrid(); });
-      $('inPalletNo').addEventListener('input', () => renderActionPallet('in'));
+      $('inPalletNo').addEventListener('focus', renderInboundPalletSuggestions);
+      $('inPalletNo').addEventListener('input', () => {
+        renderInboundPalletSuggestions();
+        renderActionPallet('in');
+      });
       $('inboundBtn').addEventListener('click', () => withBusy('inboundBtn', '入庫中...', recordInbound));
       $('outCooler').addEventListener('change', () => { renderLevelOptions('outLevel', selectedCooler('outCooler')); state.selectedLocations.outbound = ''; renderOutboundGrid(); });
       $('outLevel').addEventListener('change', () => { state.selectedLocations.outbound = ''; renderOutboundGrid(); });
@@ -2106,14 +2134,28 @@
         renderSearchStandardSuggestions();
         renderSearch();
       });
-      ['searchCooler', 'searchStatus', 'searchStartDate', 'searchEndDate'].forEach(id => $(id).addEventListener('change', renderSearch));
+      $('searchCooler').addEventListener('focus', renderSearchCoolerSuggestions);
+      $('searchCooler').addEventListener('input', () => {
+        delete $('searchCooler').dataset.coolerId;
+        renderSearchCoolerSuggestions();
+        renderSearch();
+      });
+      $('searchStatus').addEventListener('focus', renderSearchStatusSuggestions);
+      $('searchStatus').addEventListener('input', () => {
+        renderSearchStatusSuggestions();
+        renderSearch();
+      });
+      ['searchStartDate', 'searchEndDate'].forEach(id => $(id).addEventListener('change', renderSearch));
       $('searchPdfBtn').addEventListener('click', openSearchWeightPdf);
       document.addEventListener('pointerdown', event => {
         if (!event.target.closest('.search-producer-filter')) closeSearchProducerSuggestions();
         if (!event.target.closest('.search-pallet-filter')) closeSearchPalletSuggestions();
         if (!event.target.closest('.search-standard-filter')) closeSearchStandardSuggestions();
+        if (!event.target.closest('.search-cooler-filter')) closeSearchCoolerSuggestions();
+        if (!event.target.closest('.search-status-filter')) closeSearchStatusSuggestions();
+        if (!event.target.closest('.inbound-pallet-filter')) closeInboundPalletSuggestions();
         const active = document.activeElement;
-        if (!active || !['searchProducer', 'searchStandard'].includes(active.id)) return;
+        if (!active || !['searchProducer', 'searchPalletNo', 'searchStandard', 'searchCooler', 'searchStatus'].includes(active.id)) return;
         if (event.target === active) return;
         active.blur();
       });
@@ -2464,6 +2506,7 @@
       ].forEach(([kind, inputId]) => {
         const locked = !!state.lockedPallets[kind];
         $(inputId).readOnly = locked;
+        if (kind === 'inbound' && locked) closeInboundPalletSuggestions();
       });
       const hasLockedPallet = Object.values(state.lockedPallets).some(Boolean);
       document.querySelectorAll('[data-unlock-pallet]').forEach(btn => btn.classList.toggle('hidden', !hasLockedPallet));
@@ -2629,12 +2672,12 @@
     }
 
     function renderSearchOptions() {
-      const coolerSelect = $('searchCooler');
-      const previousCooler = coolerSelect.value;
-      coolerSelect.innerHTML = '<option value="">すべて</option>' + activeCoolers()
-        .map(cooler => `<option value="${esc(cooler.coolerId)}">${esc(cooler.coolerName)}</option>`)
-        .join('');
-      if (activeCoolers().some(cooler => cooler.coolerId === previousCooler)) coolerSelect.value = previousCooler;
+      const input = $('searchCooler');
+      const selectedCoolerId = cleanText(input.dataset.coolerId);
+      if (selectedCoolerId && !activeCoolers().some(cooler => cooler.coolerId === selectedCoolerId)) {
+        input.value = '';
+        delete input.dataset.coolerId;
+      }
     }
 
     function renderSearchProducerSuggestions() {
@@ -2727,6 +2770,106 @@
     function closeSearchStandardSuggestions() {
       $('searchStandardSuggestions').classList.add('hidden');
       $('searchStandard').setAttribute('aria-expanded', 'false');
+    }
+
+    function renderInboundPalletSuggestions() {
+      const input = $('inPalletNo');
+      const box = $('inPalletSuggestions');
+      if (input.readOnly) {
+        closeInboundPalletSuggestions();
+        return;
+      }
+      const query = cleanText(input.value).toLowerCase();
+      const pallets = registeredPalletsNewestFirst().filter(pallet => {
+        const text = `${pallet.palletNo || ''} ${pallet.status || ''}`.toLowerCase();
+        return pallet.status !== '保管中' && (!query || text.includes(query));
+      });
+      box.innerHTML = pallets.length ? pallets.map(pallet => `
+        <button type="button" class="search-pallet-option" data-inbound-pallet-no="${esc(pallet.palletNo)}">
+          <span>${esc(pallet.palletNo)}</span>
+          <span class="pallet-status">${esc(pallet.status || '')}</span>
+        </button>
+      `).join('') : '<div class="producer-no-match">該当なし</div>';
+      box.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+      box.querySelectorAll('[data-inbound-pallet-no]').forEach(button => {
+        button.addEventListener('click', () => {
+          input.value = button.dataset.inboundPalletNo;
+          closeInboundPalletSuggestions();
+          renderActionPallet('in');
+        });
+      });
+    }
+
+    function closeInboundPalletSuggestions() {
+      $('inPalletSuggestions').classList.add('hidden');
+      $('inPalletNo').setAttribute('aria-expanded', 'false');
+    }
+
+    function renderSearchCoolerSuggestions() {
+      const input = $('searchCooler');
+      const box = $('searchCoolerSuggestions');
+      const query = cleanText(input.value).toLowerCase();
+      const coolers = activeCoolers().filter(cooler => {
+        const text = `${cooler.coolerId || ''} ${cooler.coolerName || ''}`.toLowerCase();
+        return !query || text.includes(query);
+      });
+      const allOption = !query || 'すべて'.includes(query)
+        ? '<button type="button" class="search-cooler-option" data-search-cooler-id="">すべて</button>'
+        : '';
+      box.innerHTML = allOption + coolers.map(cooler => `
+        <button type="button" class="search-cooler-option" data-search-cooler-id="${esc(cooler.coolerId)}">
+          ${esc(cooler.coolerName)}
+        </button>
+      `).join('');
+      if (!box.innerHTML) box.innerHTML = '<div class="producer-no-match">該当なし</div>';
+      box.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+      box.querySelectorAll('[data-search-cooler-id]').forEach(button => {
+        button.addEventListener('click', () => {
+          const coolerId = button.dataset.searchCoolerId;
+          const cooler = activeCoolers().find(item => item.coolerId === coolerId);
+          input.value = cooler ? cooler.coolerName : '';
+          if (cooler) input.dataset.coolerId = cooler.coolerId;
+          else delete input.dataset.coolerId;
+          closeSearchCoolerSuggestions();
+          renderSearch();
+        });
+      });
+    }
+
+    function closeSearchCoolerSuggestions() {
+      $('searchCoolerSuggestions').classList.add('hidden');
+      $('searchCooler').setAttribute('aria-expanded', 'false');
+    }
+
+    function renderSearchStatusSuggestions() {
+      const input = $('searchStatus');
+      const box = $('searchStatusSuggestions');
+      const query = cleanText(input.value).toLowerCase();
+      const statuses = ['', '未配置', '保管中', '仮移動中', '出庫済'].filter(status => {
+        const label = status || 'すべて';
+        return !query || label.toLowerCase().includes(query);
+      });
+      box.innerHTML = statuses.length ? statuses.map(status => `
+        <button type="button" class="search-status-option" data-search-status="${esc(status)}">
+          ${esc(status || 'すべて')}
+        </button>
+      `).join('') : '<div class="producer-no-match">該当なし</div>';
+      box.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+      box.querySelectorAll('[data-search-status]').forEach(button => {
+        button.addEventListener('click', () => {
+          input.value = button.dataset.searchStatus;
+          closeSearchStatusSuggestions();
+          renderSearch();
+        });
+      });
+    }
+
+    function closeSearchStatusSuggestions() {
+      $('searchStatusSuggestions').classList.add('hidden');
+      $('searchStatus').setAttribute('aria-expanded', 'false');
     }
     function renderCoolerOptions(id) {
       const select = $(id);
@@ -3656,6 +3799,7 @@
         producerBaseNo: Number($('searchProducer').dataset.producerBaseNo || 0),
         standard: cleanText($('searchStandard').value).toLowerCase(),
         cooler: cleanText($('searchCooler').value).toLowerCase(),
+        coolerId: cleanText($('searchCooler').dataset.coolerId),
         status: cleanText($('searchStatus').value).toLowerCase(),
         palletNo: cleanText($('searchPalletNo').value).toLowerCase(),
         startDate: cleanText($('searchStartDate').value),
@@ -3697,9 +3841,12 @@
         const producerMatches = filters.producerSource && filters.producerBaseNo
           ? row.producerSource === filters.producerSource && row.producerBaseNo === filters.producerBaseNo
           : includes(producerValue, filters.producer);
+        const coolerMatches = filters.coolerId
+          ? cleanText(row.location && row.location.coolerId) === filters.coolerId
+          : includes(row.coolerText, filters.cooler);
         return producerMatches
           && includes(row.standard, filters.standard)
-          && includes(row.coolerText, filters.cooler)
+          && coolerMatches
           && includes(row.palletStatus, filters.status)
           && includes(row.palletNo, filters.palletNo)
           && (!filters.startDate || (row.registeredDate && row.registeredDate >= filters.startDate))
@@ -3727,16 +3874,13 @@
       </tr>`).join('');
       const footerCells = matrix.coolers.map(cooler => `<td>${num(matrix.coolerTotals[cooler.coolerId] || 0)}</td>`).join('');
       const createdAt = new Date().toLocaleString('ja-JP');
-      const selectedText = id => {
-        const select = $(id);
-        return cleanText(select.value) ? cleanText(select.selectedOptions[0]?.textContent || select.value) : 'すべて';
-      };
+      const selectedSearchText = id => cleanText($(id).value) || 'すべて';
       const searchConditions = [
         ['生産者', cleanText($('searchProducer').value) || 'すべて'],
         ['パレット番号', cleanText($('searchPalletNo').value) || 'すべて'],
         ['規格', cleanText($('searchStandard').value) || 'すべて'],
-        ['冷蔵庫', selectedText('searchCooler')],
-        ['状態', selectedText('searchStatus')],
+        ['冷蔵庫', selectedSearchText('searchCooler')],
+        ['状態', selectedSearchText('searchStatus')],
         ['開始日', cleanText($('searchStartDate').value) || '指定なし'],
         ['終了日', cleanText($('searchEndDate').value) || '指定なし']
       ].map(([label, value]) => `<div class="condition"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('');
