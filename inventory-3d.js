@@ -110,9 +110,9 @@
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.enableZoom = true;
-    controls.rotateSpeed = touchDevice ? 0.72 : 1;
-    controls.panSpeed = touchDevice ? 0.72 : 1;
-    controls.zoomSpeed = touchDevice ? 0.48 : 0.65;
+    controls.rotateSpeed = touchDevice ? 0.36 : 0.5;
+    controls.panSpeed = touchDevice ? 0.36 : 0.5;
+    controls.zoomSpeed = touchDevice ? 0.24 : 0.325;
     controls.zoomToCursor = false;
     controls.screenSpacePanning = true;
     controls.minDistance = 0.08;
@@ -199,7 +199,7 @@
       if (Math.abs(travelDistance) < 0.0001) return;
       const forward = controls.target.clone().sub(camera.position);
       if (forward.lengthSq() < 0.000001) return;
-      const travel = forward.normalize().multiplyScalar(travelDistance * 0.55);
+      const travel = forward.normalize().multiplyScalar(travelDistance * 0.275);
       adjustingPinchTravel = true;
       camera.position.add(travel);
       controls.target.add(travel);
