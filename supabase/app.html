@@ -969,7 +969,8 @@
       grid-area: producer;
     }
     .search-producer-suggestions,
-    .search-pallet-suggestions {
+    .search-pallet-suggestions,
+    .search-standard-suggestions {
       position: absolute;
       top: calc(100% + 4px);
       right: 0;
@@ -991,9 +992,11 @@
       box-shadow: 0 8px 18px rgba(15, 23, 42, .18);
     }
     .search-producer-suggestions.hidden,
-    .search-pallet-suggestions.hidden { display: none; }
+    .search-pallet-suggestions.hidden,
+    .search-standard-suggestions.hidden { display: none; }
     .search-producer-option,
-    .search-pallet-option {
+    .search-pallet-option,
+    .search-standard-option {
       display: grid;
       grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
       gap: 8px;
@@ -1028,7 +1031,14 @@
       color: var(--muted);
       font-size: 12px;
     }
-    .search-standard-filter { grid-area: standard; }
+    .search-standard-filter {
+      position: relative;
+      grid-area: standard;
+    }
+    .search-standard-option {
+      display: block;
+      font-weight: 800;
+    }
     .search-cooler-filter { grid-area: cooler; }
     .search-status-filter { grid-area: status; }
     .search-start-date-filter { grid-area: start-date; }
@@ -1770,7 +1780,8 @@
         </div>
         <div class="search-filter search-standard-filter">
           <span class="search-filter-label">規格</span>
-          <input id="searchStandard" list="searchStandardOptions" autocomplete="off" aria-label="規格">
+          <input id="searchStandard" autocomplete="off" aria-label="規格" aria-controls="searchStandardSuggestions" aria-expanded="false">
+          <div id="searchStandardSuggestions" class="search-standard-suggestions hidden"></div>
         </div>
         <label class="search-cooler-filter">冷蔵庫
           <select id="searchCooler"></select>
@@ -1791,7 +1802,6 @@
           <input id="searchEndDate" type="date">
         </label>
       </div>
-      <datalist id="searchStandardOptions"></datalist>
       <div class="action-row">
         <button type="button" id="searchPdfBtn"><i data-lucide="file-text"></i><span>一覧表PDF</span></button>
       </div>
@@ -2091,12 +2101,17 @@
         renderSearchPalletSuggestions();
         renderSearch();
       });
-      $('searchStandard').addEventListener('input', renderSearch);
+      $('searchStandard').addEventListener('focus', renderSearchStandardSuggestions);
+      $('searchStandard').addEventListener('input', () => {
+        renderSearchStandardSuggestions();
+        renderSearch();
+      });
       ['searchCooler', 'searchStatus', 'searchStartDate', 'searchEndDate'].forEach(id => $(id).addEventListener('change', renderSearch));
       $('searchPdfBtn').addEventListener('click', openSearchWeightPdf);
       document.addEventListener('pointerdown', event => {
         if (!event.target.closest('.search-producer-filter')) closeSearchProducerSuggestions();
         if (!event.target.closest('.search-pallet-filter')) closeSearchPalletSuggestions();
+        if (!event.target.closest('.search-standard-filter')) closeSearchStandardSuggestions();
         const active = document.activeElement;
         if (!active || !['searchProducer', 'searchStandard'].includes(active.id)) return;
         if (event.target === active) return;
@@ -2614,9 +2629,6 @@
     }
 
     function renderSearchOptions() {
-      $('searchStandardOptions').innerHTML = activeStandards()
-        .map(standard => `<option value="${esc(standard.standardId)}"></option>`)
-        .join('');
       const coolerSelect = $('searchCooler');
       const previousCooler = coolerSelect.value;
       coolerSelect.innerHTML = '<option value="">すべて</option>' + activeCoolers()
@@ -2686,6 +2698,35 @@
     function closeSearchPalletSuggestions() {
       $('searchPalletSuggestions').classList.add('hidden');
       $('searchPalletNo').setAttribute('aria-expanded', 'false');
+    }
+
+    function renderSearchStandardSuggestions() {
+      const input = $('searchStandard');
+      const box = $('searchStandardSuggestions');
+      const query = cleanText(input.value).toLowerCase();
+      const standards = activeStandards().filter(standard => {
+        const text = cleanText(standard.standardId).toLowerCase();
+        return !query || text.includes(query);
+      });
+      box.innerHTML = standards.length ? standards.map(standard => `
+        <button type="button" class="search-standard-option" data-standard-id="${esc(standard.standardId)}">
+          ${esc(standard.standardId)}
+        </button>
+      `).join('') : '<div class="producer-no-match">該当なし</div>';
+      box.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+      box.querySelectorAll('[data-standard-id]').forEach(button => {
+        button.addEventListener('click', () => {
+          input.value = button.dataset.standardId;
+          closeSearchStandardSuggestions();
+          renderSearch();
+        });
+      });
+    }
+
+    function closeSearchStandardSuggestions() {
+      $('searchStandardSuggestions').classList.add('hidden');
+      $('searchStandard').setAttribute('aria-expanded', 'false');
     }
     function renderCoolerOptions(id) {
       const select = $(id);
