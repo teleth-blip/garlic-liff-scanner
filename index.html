@@ -954,7 +954,8 @@
       grid-template-columns: repeat(6, minmax(0, 1fr));
       grid-template-areas:
         "producer producer producer producer pallet pallet"
-        "standard standard cooler cooler status status";
+        "standard standard cooler cooler status status"
+        "start-date start-date start-date end-date end-date end-date";
       gap: 6px;
       align-items: end;
       width: 100%;
@@ -966,6 +967,8 @@
     .search-standard-filter { grid-area: standard; }
     .search-cooler-filter { grid-area: cooler; }
     .search-status-filter { grid-area: status; }
+    .search-start-date-filter { grid-area: start-date; }
+    .search-end-date-filter { grid-area: end-date; }
     .search-controls label,
     .search-controls .search-filter {
       min-width: 0;
@@ -1712,6 +1715,12 @@
             <option value="出庫済">出庫済</option>
           </select>
         </label>
+        <label class="search-start-date-filter">開始日
+          <input id="searchStartDate" type="date">
+        </label>
+        <label class="search-end-date-filter">終了日
+          <input id="searchEndDate" type="date">
+        </label>
       </div>
       <datalist id="searchProducerOptions"></datalist>
       <datalist id="searchPalletOptions"></datalist>
@@ -1999,7 +2008,7 @@
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
       ['searchProducer', 'searchStandard', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
-      ['searchCooler', 'searchStatus'].forEach(id => $(id).addEventListener('change', renderSearch));
+      ['searchCooler', 'searchStatus', 'searchStartDate', 'searchEndDate'].forEach(id => $(id).addEventListener('change', renderSearch));
       $('searchPdfBtn').addEventListener('click', openSearchWeightPdf);
       document.addEventListener('pointerdown', event => {
         const active = document.activeElement;
@@ -3462,7 +3471,9 @@
         standard: cleanText($('searchStandard').value).toLowerCase(),
         cooler: cleanText($('searchCooler').value).toLowerCase(),
         status: cleanText($('searchStatus').value).toLowerCase(),
-        palletNo: cleanText($('searchPalletNo').value).toLowerCase()
+        palletNo: cleanText($('searchPalletNo').value).toLowerCase(),
+        startDate: cleanText($('searchStartDate').value),
+        endDate: cleanText($('searchEndDate').value)
       };
       const detailsByPallet = new Map();
       (state.data.details || []).forEach(detail => {
@@ -3488,6 +3499,7 @@
             coolerName,
             coolerText,
             producerText,
+            registeredDate: localDateKey(pallet.registeredAtRaw || pallet.registeredAt),
             detailNo: Number(detail.detailNo || 0)
           };
         });
@@ -3497,7 +3509,9 @@
           && includes(row.standard, filters.standard)
           && includes(row.coolerText, filters.cooler)
           && includes(row.palletStatus, filters.status)
-          && includes(row.palletNo, filters.palletNo);
+          && includes(row.palletNo, filters.palletNo)
+          && (!filters.startDate || (row.registeredDate && row.registeredDate >= filters.startDate))
+          && (!filters.endDate || (row.registeredDate && row.registeredDate <= filters.endDate));
       }).sort((a, b) => a.palletNo.localeCompare(b.palletNo, 'ja') || a.detailNo - b.detailNo);
     }
 
@@ -3530,7 +3544,9 @@
         ['パレット番号', cleanText($('searchPalletNo').value) || 'すべて'],
         ['規格', cleanText($('searchStandard').value) || 'すべて'],
         ['冷蔵庫', selectedText('searchCooler')],
-        ['状態', selectedText('searchStatus')]
+        ['状態', selectedText('searchStatus')],
+        ['開始日', cleanText($('searchStartDate').value) || '指定なし'],
+        ['終了日', cleanText($('searchEndDate').value) || '指定なし']
       ].map(([label, value]) => `<div class="condition"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('');
       printWindow.document.open();
       printWindow.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8">
@@ -3701,10 +3717,11 @@
 
     function searchDetailTable(rows) {
       return `<div class="search-detail-table"><table>
-        <thead><tr><th>パレット</th><th>状態</th><th>冷蔵庫名</th><th>行</th><th>列</th><th>段数</th><th>生産者</th><th>規格</th><th>重量</th><th>コンテナ数</th><th>操作</th></tr></thead>
+        <thead><tr><th>パレット</th><th>登録日</th><th>状態</th><th>冷蔵庫名</th><th>行</th><th>列</th><th>段数</th><th>生産者</th><th>規格</th><th>重量</th><th>コンテナ数</th><th>操作</th></tr></thead>
         <tbody>${rows.map(row => `
           <tr data-search-pallet="${esc(row.palletNo)}">
             <td>${esc(row.palletNo)}</td>
+            <td>${esc(formatDateOnlyText(row.pallet.registeredAtRaw || row.pallet.registeredAt))}</td>
             <td>${esc(row.palletStatus)}</td>
             <td>${esc(row.coolerName)}</td>
             <td>${row.location ? num(row.location.row) : ''}</td>
@@ -4385,6 +4402,20 @@
         hour: '2-digit',
         minute: '2-digit'
       });
+    }
+
+    function localDateKey(value) {
+      if (!value) return '';
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        const match = cleanText(value).match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+        return match ? `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}` : '';
+      }
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function formatDateOnlyText(value) {
+      return localDateKey(value).replaceAll('-', '/');
     }
 
     function showToast(message, isError = false) {
