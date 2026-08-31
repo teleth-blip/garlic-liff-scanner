@@ -199,8 +199,10 @@
       if (Math.abs(travelDistance) < 0.0001) return;
       const forward = controls.target.clone().sub(camera.position);
       if (forward.lengthSq() < 0.000001) return;
+      const travel = forward.normalize().multiplyScalar(travelDistance * 0.55);
       adjustingPinchTravel = true;
-      controls.target.addScaledVector(forward.normalize(), travelDistance);
+      camera.position.add(travel);
+      controls.target.add(travel);
       controls.update();
       adjustingPinchTravel = false;
       pinchTravelDistance = camera.position.distanceTo(controls.target);
