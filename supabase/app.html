@@ -964,7 +964,54 @@
       max-width: 760px;
       margin-bottom: 10px;
     }
-    .search-producer-filter { grid-area: producer; }
+    .search-producer-filter {
+      position: relative;
+      grid-area: producer;
+    }
+    .search-producer-suggestions {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      left: 0;
+      z-index: 230;
+      display: grid;
+      gap: 4px;
+      max-height: min(45vh, 320px);
+      max-height: min(45dvh, 320px);
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .18);
+    }
+    .search-producer-suggestions.hidden { display: none; }
+    .search-producer-option {
+      display: grid;
+      grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      min-height: 42px;
+      padding: 7px 9px;
+      border: 1px solid #d7ded9;
+      border-radius: 6px;
+      background: #f8fbf9;
+      color: var(--ink);
+      text-align: left;
+    }
+    .search-producer-option .producer-code {
+      font-variant-numeric: tabular-nums;
+      font-weight: 900;
+    }
+    .search-producer-option .producer-name {
+      overflow-wrap: anywhere;
+      font-weight: 700;
+    }
     .search-pallet-filter { grid-area: pallet; }
     .search-standard-filter { grid-area: standard; }
     .search-cooler-filter { grid-area: cooler; }
@@ -1698,7 +1745,8 @@
       <div class="search-controls">
         <div class="search-filter search-producer-filter">
           <span class="search-filter-label">生産者</span>
-          <input id="searchProducer" list="searchProducerOptions" autocomplete="off" placeholder="番号・名前" aria-label="生産者">
+          <input id="searchProducer" autocomplete="off" placeholder="番号・名前" aria-label="生産者" aria-controls="searchProducerSuggestions" aria-expanded="false">
+          <div id="searchProducerSuggestions" class="search-producer-suggestions hidden"></div>
         </div>
         <div class="search-filter search-pallet-filter">
           <span class="search-filter-label">パレット番号</span>
@@ -1727,7 +1775,6 @@
           <input id="searchEndDate" type="date">
         </label>
       </div>
-      <datalist id="searchProducerOptions"></datalist>
       <datalist id="searchPalletOptions"></datalist>
       <datalist id="searchStandardOptions"></datalist>
       <div class="action-row">
@@ -2017,10 +2064,18 @@
       $('checkCooler').addEventListener('change', () => { renderLevelOptions('checkLevel', selectedCooler('checkCooler')); renderCheckGrid(); });
       $('checkLevel').addEventListener('change', renderCheckGrid);
       $('searchPallet').addEventListener('input', handleInventorySearch);
-      ['searchProducer', 'searchStandard', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
+      $('searchProducer').addEventListener('focus', renderSearchProducerSuggestions);
+      $('searchProducer').addEventListener('input', () => {
+        delete $('searchProducer').dataset.producerSource;
+        delete $('searchProducer').dataset.producerBaseNo;
+        renderSearchProducerSuggestions();
+        renderSearch();
+      });
+      ['searchStandard', 'searchPalletNo'].forEach(id => $(id).addEventListener('input', renderSearch));
       ['searchCooler', 'searchStatus', 'searchStartDate', 'searchEndDate'].forEach(id => $(id).addEventListener('change', renderSearch));
       $('searchPdfBtn').addEventListener('click', openSearchWeightPdf);
       document.addEventListener('pointerdown', event => {
+        if (!event.target.closest('.search-producer-filter')) closeSearchProducerSuggestions();
         const active = document.activeElement;
         if (!active || !['searchProducer', 'searchStandard'].includes(active.id)) return;
         if (event.target === active) return;
@@ -2538,9 +2593,6 @@
     }
 
     function renderSearchOptions() {
-      $('searchProducerOptions').innerHTML = activeProducers()
-        .map(producer => `<option value="${esc(producerChoiceDisplay(producer))}"></option>`)
-        .join('');
       $('searchStandardOptions').innerHTML = activeStandards()
         .map(standard => `<option value="${esc(standard.standardId)}"></option>`)
         .join('');
@@ -2554,6 +2606,40 @@
         .map(cooler => `<option value="${esc(cooler.coolerId)}">${esc(cooler.coolerName)}</option>`)
         .join('');
       if (activeCoolers().some(cooler => cooler.coolerId === previousCooler)) coolerSelect.value = previousCooler;
+    }
+
+    function renderSearchProducerSuggestions() {
+      const input = $('searchProducer');
+      const box = $('searchProducerSuggestions');
+      const query = cleanText(input.value).toLowerCase();
+      const producers = activeProducers().filter(producer => !query || producerSearchText(producer).toLowerCase().includes(query));
+      box.innerHTML = producers.length ? producers.map(producer => {
+        const p = enrichProducer(producer);
+        return `<button type="button" class="search-producer-option" data-producer-no="${esc(p.producerNo)}" data-producer-source="${esc(p.producerSource)}">
+          <span class="producer-code">${esc(producerListCode(p))}</span>
+          <span class="producer-name">${esc(p.producerName || '(名称なし)')}</span>
+        </button>`;
+      }).join('') : '<div class="producer-no-match">該当なし</div>';
+      box.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+      box.querySelectorAll('[data-producer-no]').forEach(button => {
+        button.addEventListener('pointerdown', event => {
+          event.preventDefault();
+          const producer = findProducer(button.dataset.producerNo, button.dataset.producerSource);
+          if (!producer) return;
+          const p = enrichProducer(producer);
+          input.value = `${producerListCode(p)} ${p.producerName || '(名称なし)'}`;
+          input.dataset.producerSource = p.producerSource;
+          input.dataset.producerBaseNo = String(p.producerBaseNumber);
+          closeSearchProducerSuggestions();
+          renderSearch();
+        });
+      });
+    }
+
+    function closeSearchProducerSuggestions() {
+      $('searchProducerSuggestions').classList.add('hidden');
+      $('searchProducer').setAttribute('aria-expanded', 'false');
     }
     function renderCoolerOptions(id) {
       const select = $(id);
@@ -3479,6 +3565,8 @@
     function searchDetailRows() {
       const filters = {
         producer: cleanText($('searchProducer').value).toLowerCase(),
+        producerSource: cleanText($('searchProducer').dataset.producerSource),
+        producerBaseNo: Number($('searchProducer').dataset.producerBaseNo || 0),
         standard: cleanText($('searchStandard').value).toLowerCase(),
         cooler: cleanText($('searchCooler').value).toLowerCase(),
         status: cleanText($('searchStatus').value).toLowerCase(),
@@ -3500,6 +3588,7 @@
         const details = detailsByPallet.get(pallet.palletNo) || [{}];
         return details.map(detail => {
           const producerText = producerLabel(detail) || '';
+          const producerInfo = parseProducerNo(detail.producerNo);
           return {
             ...detail,
             palletNo: pallet.palletNo,
@@ -3510,13 +3599,18 @@
             coolerName,
             coolerText,
             producerText,
+            producerSource: producerInfo.source,
+            producerBaseNo: producerInfo.baseNumber,
             registeredDate: localDateKey(pallet.registeredAtRaw || pallet.registeredAt),
             detailNo: Number(detail.detailNo || 0)
           };
         });
       }).filter(row => {
         const producerValue = [row.producerNo, row.producerName, row.producerText].filter(Boolean).join(' ');
-        return includes(producerValue, filters.producer)
+        const producerMatches = filters.producerSource && filters.producerBaseNo
+          ? row.producerSource === filters.producerSource && row.producerBaseNo === filters.producerBaseNo
+          : includes(producerValue, filters.producer);
+        return producerMatches
           && includes(row.standard, filters.standard)
           && includes(row.coolerText, filters.cooler)
           && includes(row.palletStatus, filters.status)
