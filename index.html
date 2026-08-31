@@ -84,9 +84,21 @@
       font-size: 12px;
       white-space: nowrap;
     }
-    .worker-select-label select {
+    .worker-display {
+      display: flex;
+      align-items: center;
       width: 100%;
       min-height: 36px;
+      min-width: 0;
+      padding: 6px 8px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #eef3f0;
+      color: var(--ink);
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       padding: 6px 8px;
       font-size: 13px;
     }
@@ -376,10 +388,10 @@
         grid-template-columns: minmax(82px, 1fr);
         max-width: 118px;
       }
-      .worker-select-label span {
+      .worker-select-label .worker-caption {
         display: none;
       }
-      .worker-select-label select {
+      .worker-display {
         min-height: 34px;
         padding: 5px 6px;
         font-size: 12px;
@@ -1594,9 +1606,9 @@
     <div class="header-row">
       <h1>にんにく冷蔵庫管理</h1>
       <div class="worker-bar">
-        <label class="worker-select-label"><span>作業者</span>
-          <select id="workerSelect"></select>
-        </label>
+        <div class="worker-select-label"><span class="worker-caption">作業者</span>
+          <span id="workerDisplay" class="worker-display" aria-label="ログイン中の作業者"></span>
+        </div>
         <button type="button" id="reloadBtn" class="secondary header-btn"><i data-lucide="refresh-cw"></i><span>更新</span></button>
         <button type="button" id="logoutBtn" class="secondary header-btn"><i data-lucide="log-out"></i><span>ログアウト</span></button>
       </div>
@@ -2027,11 +2039,6 @@
         event.preventDefault();
         login();
       });
-      $('workerSelect').addEventListener('change', () => {
-        state.workerId = $('workerSelect').value;
-        localStorage.setItem('garlic.workerId', state.workerId);
-        saveLoginState(state.workerId);
-      });
       $('openRegisterModalBtn').addEventListener('click', openRegisterModal);
       $('regWeight').addEventListener('input', distributeDetailWeightsByContainerCount);
       $('addDetailBtn').addEventListener('click', () => addDetailRow());
@@ -2348,12 +2355,19 @@
     async function refreshAll() {
       try {
         showToast('作業者を読み込んでいます。');
-        await refreshWorkersOnly().catch(error => console.warn(error));
+        const workersReady = await refreshWorkersOnly().catch(error => {
+          console.warn(error);
+          return true;
+        });
+        if (!workersReady) return;
         showToast('データを読み込んでいます。');
         const data = await api('getAppData');
         state.data = data;
         state.workers = data.master.workers || state.workers;
-        ensureWorkerSelection();
+        if (!ensureWorkerSelection()) {
+          logout('ログイン中の作業者が無効です。もう一度ログインしてください。');
+          return;
+        }
         renderAll();
         showToast('読み込みました。');
       } catch (error) {
@@ -2561,7 +2575,10 @@
       state.loggedIn = true;
       document.body.classList.remove('login-locked');
       $('loginScreen').classList.add('hidden');
-      ensureWorkerSelection();
+      if (!ensureWorkerSelection()) {
+        logout('ログイン中の作業者が無効です。もう一度ログインしてください。');
+        return;
+      }
       renderWorkers();
       await refreshAll();
     }
@@ -2593,13 +2610,14 @@
       await unlockApp();
     }
 
-    function logout() {
+    function logout(message = 'ログアウトしました。') {
       localStorage.removeItem('garlic.login.v1');
       localStorage.removeItem('garlic.login.v2');
       localStorage.removeItem('garlic.workerId');
       state.workerId = '';
       state.data = null;
-      showLoginScreen('ログアウトしました。');
+      renderWorkers();
+      showLoginScreen(message);
     }
 
     function restoreLogin() {
@@ -2635,14 +2653,12 @@
 
     function ensureWorkerSelection() {
       const workers = activeWorkers();
-      if (!state.workerId || !workers.some(w => w.workerId === state.workerId)) {
-        state.workerId = workers[0] ? workers[0].workerId : '';
-      }
+      return !!state.workerId && workers.some(w => w.workerId === state.workerId);
     }
 
     function renderWorkers() {
-      $('workerSelect').innerHTML = activeWorkers().map(w => `<option value="${esc(w.workerId)}">${esc(w.workerName)}</option>`).join('');
-      $('workerSelect').value = state.workerId;
+      const worker = activeWorkers().find(item => item.workerId === state.workerId);
+      $('workerDisplay').textContent = worker ? worker.workerName : '未ログイン';
     }
 
     function renderLoginWorkers() {
@@ -2654,9 +2670,13 @@
     async function refreshWorkersOnly(options = {}) {
       const res = await api('getWorkers');
       state.workers = res && res.master && Array.isArray(res.master.workers) ? res.master.workers : [];
-      if (!options.forLogin) ensureWorkerSelection();
+      if (!options.forLogin && !ensureWorkerSelection()) {
+        logout('ログイン中の作業者が無効です。もう一度ログインしてください。');
+        return false;
+      }
       renderLoginWorkers();
       if (!options.forLogin) renderWorkers();
+      return true;
     }
 
     function renderSelectors() {
