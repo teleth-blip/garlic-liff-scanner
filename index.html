@@ -278,7 +278,7 @@
       white-space: nowrap;
     }
     .inventory-3d-toolbar button { min-height: 36px; padding: 7px 9px; }
-    .inventory-3d-opacity {
+    .inventory-3d-slider {
       display: grid;
       grid-template-columns: auto 90px;
       gap: 6px;
@@ -287,7 +287,9 @@
       font-size: 12px;
       font-weight: 800;
     }
-    .inventory-3d-opacity input { min-height: 28px; padding: 0; }
+    .inventory-3d-slider span { white-space: nowrap; }
+    .inventory-3d-slider output { font-variant-numeric: tabular-nums; }
+    .inventory-3d-slider input { min-height: 28px; padding: 0; }
     .inventory-3d-close {
       position: fixed;
       top: calc(10px + env(safe-area-inset-top));
@@ -355,7 +357,7 @@
         flex: 1 1 100%;
         max-width: 100%;
       }
-      .inventory-3d-opacity { grid-template-columns: auto 72px; }
+      .inventory-3d-slider { grid-template-columns: auto 72px; }
     }
     @media (max-width: 420px) {
       .app-header {
@@ -1479,8 +1481,11 @@
     <div class="inventory-3d-toolbar">
       <div id="inventory3dTitle" class="inventory-3d-title"></div>
       <button type="button" id="inventory3dResetBtn" class="secondary small" title="視点を初期位置に戻す"><i data-lucide="scan"></i><span>視点リセット</span></button>
-      <label class="inventory-3d-opacity">透過
+      <label class="inventory-3d-slider"><span>透過</span>
         <input id="inventory3dTransparency" type="range" min="10" max="85" step="5" value="45">
+      </label>
+      <label class="inventory-3d-slider"><span>感度 <output id="inventory3dSensitivityValue">100%</output></span>
+        <input id="inventory3dSensitivity" type="range" min="20" max="200" step="10" value="100">
       </label>
     </div>
     <div id="inventory3dInfo" class="inventory-3d-info hidden"></div>
@@ -1958,6 +1963,11 @@
       $('inventory3dCloseBtn').addEventListener('click', closeInventory3d);
       $('inventory3dResetBtn').addEventListener('click', () => window.GarlicInventory3D.reset());
       $('inventory3dTransparency').addEventListener('input', event => window.GarlicInventory3D.setTransparency(event.target.value));
+      $('inventory3dSensitivity').addEventListener('input', event => {
+        const value = Math.min(200, Math.max(20, Number(event.target.value) || 100));
+        $('inventory3dSensitivityValue').textContent = `${value}%`;
+        window.GarlicInventory3D.setSensitivity(value);
+      });
       document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && !$('palletConfirmModal').classList.contains('hidden')) closePalletConfirm();
         if (event.key === 'Escape' && !$('operationConfirmModal').classList.contains('hidden')) closeOperationConfirm();
@@ -3191,6 +3201,7 @@
           })),
           selectedPalletNo: state.inventorySelectedPalletNo,
           transparency: $('inventory3dTransparency').value,
+          sensitivity: $('inventory3dSensitivity').value,
           onSelect: selectInventory3dPallet
         });
         if (requestId !== state.inventory3dRequestId || modal.classList.contains('hidden')) {

@@ -105,14 +105,18 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     const touchDevice = (navigator.maxTouchPoints || 0) > 0 || window.matchMedia('(pointer: coarse)').matches;
+    const baseSensitivity = touchDevice
+      ? { rotate: 0.36, pan: 0.36, zoom: 0.24, pinchTravel: 0.275 }
+      : { rotate: 0.5, pan: 0.5, zoom: 0.325, pinchTravel: 0.275 };
+    let sensitivity = clamp(Number(options.sensitivity ?? 100), 20, 200) / 100;
     controls.target.copy(center);
     controls.enableDamping = false;
     controls.enablePan = true;
     controls.enableRotate = true;
     controls.enableZoom = true;
-    controls.rotateSpeed = touchDevice ? 0.36 : 0.5;
-    controls.panSpeed = touchDevice ? 0.36 : 0.5;
-    controls.zoomSpeed = touchDevice ? 0.24 : 0.325;
+    controls.rotateSpeed = baseSensitivity.rotate * sensitivity;
+    controls.panSpeed = baseSensitivity.pan * sensitivity;
+    controls.zoomSpeed = baseSensitivity.zoom * sensitivity;
     controls.zoomToCursor = false;
     controls.screenSpacePanning = true;
     controls.minDistance = 0.08;
@@ -199,7 +203,7 @@
       if (Math.abs(travelDistance) < 0.0001) return;
       const forward = controls.target.clone().sub(camera.position);
       if (forward.lengthSq() < 0.000001) return;
-      const travel = forward.normalize().multiplyScalar(travelDistance * 0.275);
+      const travel = forward.normalize().multiplyScalar(travelDistance * baseSensitivity.pinchTravel * sensitivity);
       adjustingPinchTravel = true;
       camera.position.add(travel);
       controls.target.add(travel);
@@ -316,6 +320,12 @@
         palletMaterials.forEach(material => { material.opacity = 1 - transparency / 100; });
         requestRender();
       },
+      setSensitivity(value) {
+        sensitivity = clamp(Number(value), 20, 200) / 100;
+        controls.rotateSpeed = baseSensitivity.rotate * sensitivity;
+        controls.panSpeed = baseSensitivity.pan * sensitivity;
+        controls.zoomSpeed = baseSensitivity.zoom * sensitivity;
+      },
       reset() {
         controls.reset();
         requestRender();
@@ -393,6 +403,10 @@
     if (view) view.setTransparency(value);
   }
 
+  function setSensitivity(value) {
+    if (view) view.setSensitivity(value);
+  }
+
   function makeLocationId(coolerId, level, row, col) {
     return `${coolerId}-${level}-R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}`;
   }
@@ -409,5 +423,5 @@
     return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
   }
 
-  window.GarlicInventory3D = { open, close, reset, setTransparency };
+  window.GarlicInventory3D = { open, close, reset, setTransparency, setSensitivity };
 }());
